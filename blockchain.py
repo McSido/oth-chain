@@ -50,9 +50,19 @@ class Blockchain (object):
             print('Invalid block')
 
     def validate_block(self, block):
+        """ Validate a block
+        Abstract function!
+        Arguments:
+        block -> Type as namedtuple at the top of the file
+        """
         raise NotImplementedError
 
     def validate_transaction(self, transaction):
+        """ Validate a transaction
+        Abstract function!
+        Arguments:
+        transaction -> Type as namedtuple at the top of the file
+        """
         raise NotImplementedError
 
     def create_block(self, proof):
@@ -71,10 +81,17 @@ class Blockchain (object):
         return block
 
     def create_proof(self):
+        """ Create a proof for a new block
+        Abstract function!
+
+        Returns a proof
+        """
         raise NotImplementedError
 
-    def resolve_conflict(self, new_block_index):
-        self.broadcast_queue.put(('get_block', new_block_index))
+    def resolve_conflict(self):
+        """ Resolve conflict between to blockchains/forks
+        Abstract function!
+        """
         raise NotImplementedError
 
     @staticmethod

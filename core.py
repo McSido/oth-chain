@@ -24,6 +24,10 @@ def receive_msg(msg_type, msg_data, blockchain):
 
 def main():
     # Create queues for message transfer blockchain<->networking
+    # Every message on the broadcast_queue should be sent to all connected
+    #  nodes
+    # Every message on the receive_queue should be worked on by the
+    #  blockchain
     broadcast_queue = Queue()
     receive_queue = Queue()
 
