@@ -27,7 +27,7 @@ class PoW_Blockchain(Blockchain):
         return True
 
     def validate_transaction(self, transaction):
-        return True
+        return transaction not in self.transaction_pool
         # TODO: check if transaction is valid (e.g. signed + enough money)
 
     def create_proof(self):

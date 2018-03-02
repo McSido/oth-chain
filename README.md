@@ -24,7 +24,7 @@ Communication happens between Blockchain<->Networking
 ### broadcast_queue
 Blockchain -> Networking (-> all nodes)
 
-Message-types
+Message types
 * new_block
 * new_transaction
 
