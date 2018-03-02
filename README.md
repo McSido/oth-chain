@@ -9,13 +9,21 @@ A Proof-of-Work blockchain that uses sha256 as the hashing-algorithm \
 Basic functionality implemented
 ## [networking.py](./networking-py)
 Responsible for all parts of the networking/P2P aspect of the blockchain \
+Currently uses UDP packages and is able to receive and send messages\
 Needs:
 * peer discovery
 * peer management (find/remove disconnected nodes)
-* messaging between peers
 ## [core.py](./core.py)
 Start of the blockchain \
 Responsible for the setup of the blockchain and networking system
+
+# Instructions
+1. Clone repo
+2. Make copy of repo
+3. Change [networking.py](./networking-py) in copy - Line 10: PORT = 6667 
+4. Change [networking.py](./networking-py) in copy - Line 63: peer_list.add(('localhost', 6666))
+5. Start [core.py](./core.py) of the copy
+6. Start [core.py](./core.py) of original (preferably from IDE, to see what is happening to the blockchain)
 
 # Information
 ## Internal communication
