@@ -1,5 +1,6 @@
 import hashlib
-from blockchain import Blockchain, Block, Transaction
+
+from blockchain import Block, Blockchain, Transaction
 
 
 class PoW_Blockchain(Blockchain):
@@ -14,7 +15,7 @@ class PoW_Blockchain(Blockchain):
             self.broadcast_queue.put(('new_block', block))
             self.chain.append(block)
         else:
-            print('Invalid block')
+            print('### DEBUG ### Invalid block')
 
     def validate_block(self, block, last_block):
         # check if the hash of the new block is valid

@@ -1,10 +1,10 @@
-import socket
 import pickle  # change for secure solution
 # (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
-from blockchain import Transaction, Block
-from queue import Empty
+import socket
 import time
+from queue import Empty
 
+from blockchain import Block, Transaction
 
 # Initialize
 PORT = 6666
@@ -36,6 +36,7 @@ def pack_msg(msg):
 
 def process_incoming_msg(msg, in_address, receive_queue):
     msg_type, msg_data = unpack_msg(msg)
+    print('### DEBUG ### received: ' + msg_type)
     if msg_type.startswith('N_'):
         # networking messages
         if msg_type == 'N_new_peer':
@@ -60,13 +61,13 @@ def new_peer(address):
 
 def example_worker(broadcast_queue, receive_queue):
     # Setup peers
-    peer_list.add(('localhost', 6667))
+    peer_list.add(('127.0.0.1', 6667))
 
-    # Add fake messages to node with PORT=6666
-    if PORT == 6666:
-        broadcast_queue.put(('new_transaction', Transaction("a", "b", 10)))
-        broadcast_queue.put(('new_transaction', Transaction("a", "c", 50)))
-        broadcast_queue.put(('mine', ''))
+    # # Add fake messages to node with PORT=6666
+    # if PORT == 6666:
+    #     broadcast_queue.put(('new_transaction', Transaction("a", "b", 10)))
+    #     broadcast_queue.put(('new_transaction', Transaction("a", "c", 50)))
+    #     broadcast_queue.put(('mine', ''))
 
     # Main loop
     while True:
@@ -104,7 +105,7 @@ def worker(broadcast_queue, receive_queue):
     broadcast_queue -> Queue for messages to other nodes
     receive_queue -> Queue for messages to the attached blockchain
     """
-    print("Started networking")
+    print("### DEBUG ### Started networking")
     # Example:
     # Find peers
     # Main loop:

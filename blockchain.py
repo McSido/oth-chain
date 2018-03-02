@@ -1,6 +1,6 @@
+import hashlib
 from collections import namedtuple
 from time import time
-import hashlib
 
 Transaction = namedtuple('Transaction', ['sender', 'recipient', 'amount'])
 Block = namedtuple('Block', ['index', 'timestamp',
@@ -24,7 +24,7 @@ class Blockchain (object):
 
         # If file doesn't exist / is empty:
         # Create genesis block
-        self.chain.append(Block(0, time(), [], 0, 0))
+        self.chain.append(Block(0, 0, [], 0, 0))
 
     def new_transaction(self, transaction):
         """ Add a new transaction to the blockchain
@@ -35,7 +35,7 @@ class Blockchain (object):
             self.transaction_pool.append(transaction)
             self.broadcast_queue.put(('new_transaction', transaction))
         else:
-            print('Invalid transaction')
+            print('### DEBUG ### Invalid transaction')
 
     def new_block(self, block):
         """ Add a new block to the blockchain
@@ -47,7 +47,7 @@ class Blockchain (object):
             self.chain.append(block)
             self.broadcast_queue.put(('new_block', block))
         else:
-            print('Invalid block')
+            print('### DEBUG ### Invalid block')
 
     def validate_block(self, block):
         """ Validate a block
