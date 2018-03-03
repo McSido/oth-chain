@@ -2,6 +2,7 @@ import pickle  # change for secure solution
 # (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
 import socket
 import time
+import sys
 from queue import Empty
 
 from blockchain import Block, Transaction
@@ -10,11 +11,15 @@ from blockchain import Block, Transaction
 PORT = 6666
 peer_list = set()
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server_socket.bind(('', PORT))
-server_socket.settimeout(0.01)
 
 
 def send_msg(msg_type, msg_data, address):
+    """ Send message to address
+    Arguments:
+    msg_type -> Type of the message
+    msg_data -> Data of the message
+    address  -> Address to send message to
+    """
     server_socket.sendto(
         pack_msg((msg_type, msg_data)),
         address
@@ -22,19 +27,38 @@ def send_msg(msg_type, msg_data, address):
 
 
 def broadcast(msg_type, msg_data):
+    """ Send message to all connected peers
+    Arguments:
+    msg_type -> Type of the message
+    msg_data -> Data of the message
+    """
     for peer in peer_list:
         send_msg(msg_type, msg_data, peer)
 
 
 def unpack_msg(msg):
+    """ Deserialize a message
+    Arguments:
+    msg -> Message to unpack
+    """
     return pickle.loads(msg)
 
 
 def pack_msg(msg):
+    """ Serialize a message
+    Arguments:
+    msg -> Message to serialize
+    """
     return pickle.dumps(msg)
 
 
 def process_incoming_msg(msg, in_address, receive_queue):
+    """ Process messages received from other nodes
+    Arguments:
+    msg -> Received message
+    in_address -> Address of the sender
+    receive_queue -> Queue for communication with the blockchain
+    """
     msg_type, msg_data = unpack_msg(msg)
     print('### DEBUG ### received: ' + msg_type)
     if msg_type.startswith('N_'):
@@ -49,30 +73,52 @@ def process_incoming_msg(msg, in_address, receive_queue):
 
 
 def get_peers(address):
+    """ Send all known peers
+    Arguments:
+    address -> Address to send peers to
+    """
     for peer in peer_list:
         send_msg('N_new_peer', peer, address)
 
 
 def new_peer(address):
+    """ Process a new peer
+    New peer is broadcast to all known peers and added to peerlist
+    Arguments:
+    address -> Address of the new peer
+    """
     if address != (('', PORT)):
         broadcast('N_new_peer', address)
         peer_list.add(address)
 
 
-def example_worker(broadcast_queue, receive_queue):
-    # Setup peers
-    peer_list.add(('127.0.0.1', 6667))
+def load_initial_peers():
+    """ Load initial peers from peers.cfg file
+    """
+    # TODO: check for validity (IP-address PORT)
+    with open('./peers.cfg') as f:
+        for peer in f:
+            p = peer.split(' ')
+            peer_list.add((p[0], int(p[1])))
 
-    # # Add fake messages to node with PORT=6666
-    # if PORT == 6666:
-    #     broadcast_queue.put(('new_transaction', Transaction("a", "b", 10)))
-    #     broadcast_queue.put(('new_transaction', Transaction("a", "c", 50)))
-    #     broadcast_queue.put(('mine', ''))
+
+def example_worker(broadcast_queue, receive_queue):
+    """ Simple example of a networker
+    Arguments:
+    broadcast_queue -> Queue for messages to other nodes
+    receive_queue -> Queue for messages to the attached blockchain
+    """
+    # Setup peers
+    load_initial_peers()
 
     # Main loop
     while True:
         try:
-            msg_out_type, msg_out_data = broadcast_queue.get(block=False)
+            msg = broadcast_queue.get(block=False)
+            if msg is None:
+                server_socket.close()
+                sys.exit()
+            msg_out_type, msg_out_data = msg
         except Empty:
             pass
         else:
@@ -99,7 +145,7 @@ def local_worker(broadcast_queue, receive_queue):
     receive_queue.put(('mine', ''))
 
 
-def worker(broadcast_queue, receive_queue):
+def worker(broadcast_queue, receive_queue, port=6666):
     """ Takes care of the communication between nodes
     Arguments:
     broadcast_queue -> Queue for messages to other nodes
@@ -113,5 +159,10 @@ def worker(broadcast_queue, receive_queue):
     # - check incoming messages
     #   -- Networking message (e.g. new peer, get peers)
     #   -- Blockchain message: put on receive_queue
+
+    global PORT
+    PORT = port
+    server_socket.bind(('', PORT))
+    server_socket.settimeout(0.01)
 
     example_worker(broadcast_queue, receive_queue)

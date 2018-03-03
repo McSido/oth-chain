@@ -1,6 +1,8 @@
 import re
 import sys
 import threading
+import getopt
+import time
 from queue import Queue
 from pprint import pprint
 
@@ -24,6 +26,8 @@ def receive_msg(msg_type, msg_data, blockchain):
         proof = blockchain.create_proof()
         block = blockchain.create_block(proof)
         blockchain.new_block(block)
+    elif msg_type == 'exit':
+        sys.exit()
 
 
 def blockchain_loop(receive_queue, blockchain):
@@ -33,7 +37,25 @@ def blockchain_loop(receive_queue, blockchain):
         receive_msg(msg_type, msg_data, blockchain)
 
 
-def main():
+def main(argv=sys.argv):
+
+    port = 6666
+    try:
+        opts, args = getopt.getopt(argv[1:], 'hp=', ['help', 'port='])
+        for o, a in opts:
+            if o in ('-h', '--help'):
+                print('-p/--port to change default port')
+                sys.exit()
+            if o in ('-p', '--port'):
+                try:
+                    port = int(a)
+                except:
+                    print("Port was invalid (e.g. not an int)")
+    except getopt.GetoptError as err:
+        print('for help use --help')
+        print(err)
+        sys.exit()
+
     # Create queues for message transfer blockchain<->networking
     # Every message on the broadcast_queue should be sent to all connected
     #  nodes
@@ -41,16 +63,13 @@ def main():
     #  blockchain
     broadcast_queue = Queue()
     receive_queue = Queue()
-
-    # TODO: manage end of queue, maybe: (if queue.get() == None)
-
     # Create proof-of-work blockchain
     my_blockchain = PoW_Blockchain(broadcast_queue, 4)
 
     # Create networking thread
     networker = threading.Thread(
         target=networking.worker,
-        args=(broadcast_queue, receive_queue))
+        args=(broadcast_queue, receive_queue, port))
     networker.start()
 
     # Main blockchain loop
@@ -72,15 +91,18 @@ def main():
                 exit
                 """)
         elif command == 'exit':
-            # TODO: close queues
-            # TODO: join threads
+            receive_queue.put(('exit', ''))
+            broadcast_queue.put(None)
+
+            blockchain_thread.join()
+            networker.join()
             sys.exit()
         elif command == 'mine':
             receive_queue.put(('mine', ''))
         elif re.fullmatch(r'transaction \w+ \w+ \d+', command):
             t = command.split(' ')
             receive_queue.put(('new_transaction',
-                               Transaction(t[1], t[2], int(t[3]))
+                               Transaction(t[1], t[2], int(t[3]), time.time())
                                ))
         elif command == 'dump':
             pprint(vars(my_blockchain))

@@ -2,7 +2,8 @@ import hashlib
 from collections import namedtuple
 from time import time
 
-Transaction = namedtuple('Transaction', ['sender', 'recipient', 'amount'])
+Transaction = namedtuple(
+    'Transaction', ['sender', 'recipient', 'amount', 'timestamp'])
 Block = namedtuple('Block', ['index', 'timestamp',
                              'transactions', 'proof', 'previous_hash'])
 

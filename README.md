@@ -15,22 +15,22 @@ Needs:
 * peer management (find/remove disconnected nodes)
 ## [core.py](./core.py)
 Start of the blockchain \
-Responsible for the setup of the blockchain and networking system
+Responsible for the setup of the blockchain and networking system \
+CLI loop
 
 # Instructions
 ## Setup
 1. Clone repo
 2. Make copy of repo
-3. Change [networking.py](./networking-py) in copy - Line 10: PORT = 6667 
-4. Change [networking.py](./networking-py) in copy - Line 63: peer_list.add(('localhost', 6666))
-5. Start both [core.py](./core.py) 
+3. Change port in [peers.cfg](./peers.cfg) of the copy
+5. Start both [core.py](./core.py) with --port=\<PORT> (Standard port=6666)
 
 ## Commands
 help: prints commands\
 transaction \<from> \<to> \<amount> : Create transaction \
 mine: mine a new block \
 dump: print blockchain \
-exit: exits programm (currently not really working)
+exit: exits programm
 
 # Information
 ## Internal communication
@@ -44,7 +44,7 @@ Message types
 * new_transaction
 
 ### receive_queue
-Networking -> Blockchain
+Networking -> Blockchain \
 CLI -> Blockchain
 
 Message types
