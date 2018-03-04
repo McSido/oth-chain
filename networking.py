@@ -69,7 +69,8 @@ def process_incoming_msg(msg, in_address, receive_queue):
             get_peers(in_address)
     else:
         # blockchain messages
-        receive_queue.put((msg_type, msg_data))
+
+        receive_queue.put((msg_type, msg_data, in_address))
 
 
 def get_peers(address):
@@ -87,8 +88,9 @@ def new_peer(address):
     Arguments:
     address -> Address of the new peer
     """
-    if address != (('', PORT)):
+    if address != (('', PORT)) and address not in peer_list:
         broadcast('N_new_peer', address)
+        get_peers(address)  # Send known peers to new peer
         peer_list.add(address)
 
 
@@ -102,10 +104,10 @@ def load_initial_peers():
             peer_list.add((p[0], int(p[1])))
 
 
-def example_worker(broadcast_queue, receive_queue):
+def example_worker(send_queue, receive_queue):
     """ Simple example of a networker
     Arguments:
-    broadcast_queue -> Queue for messages to other nodes
+    send_queue -> Queue for messages to other nodes
     receive_queue -> Queue for messages to the attached blockchain
     """
     # Setup peers
@@ -114,15 +116,18 @@ def example_worker(broadcast_queue, receive_queue):
     # Main loop
     while True:
         try:
-            msg = broadcast_queue.get(block=False)
+            msg = send_queue.get(block=False)
             if msg is None:
                 server_socket.close()
                 sys.exit()
-            msg_out_type, msg_out_data = msg
+            msg_out_type, msg_out_data, msg_out_address = msg
         except Empty:
             pass
         else:
-            broadcast(msg_out_type, msg_out_data)
+            if msg_out_address == 'broadcast':
+                broadcast(msg_out_type, msg_out_data)
+            else:
+                send_msg(msg_out_type, msg_out_data, msg_out_address)
 
         try:
             msg_in, address = server_socket.recvfrom(1024)
@@ -139,23 +144,23 @@ def example_worker(broadcast_queue, receive_queue):
         # (https://stackoverflow.com/questions/29082268/python-time-sleep-vs-event-wait)
 
 
-def local_worker(broadcast_queue, receive_queue):
+def local_worker(send_queue, receive_queue):
     receive_queue.put(('new_transaction', Transaction("a", "b", 10)))
     receive_queue.put(('new_transaction', Transaction("a", "c", 50)))
     receive_queue.put(('mine', ''))
 
 
-def worker(broadcast_queue, receive_queue, port=6666):
+def worker(send_queue, receive_queue, port=6666):
     """ Takes care of the communication between nodes
     Arguments:
-    broadcast_queue -> Queue for messages to other nodes
+    send_queue -> Queue for messages to other nodes
     receive_queue -> Queue for messages to the attached blockchain
     """
     print("### DEBUG ### Started networking")
     # Example:
     # Find peers
     # Main loop:
-    # - check broadcast_queue (send new messages)
+    # - check send_queue (send new messages)
     # - check incoming messages
     #   -- Networking message (e.g. new peer, get peers)
     #   -- Blockchain message: put on receive_queue
@@ -165,4 +170,4 @@ def worker(broadcast_queue, receive_queue, port=6666):
     server_socket.bind(('', PORT))
     server_socket.settimeout(0.01)
 
-    example_worker(broadcast_queue, receive_queue)
+    example_worker(send_queue, receive_queue)

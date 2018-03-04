@@ -4,15 +4,23 @@ from blockchain import Block, Blockchain, Transaction
 
 
 class PoW_Blockchain(Blockchain):
-    def __init__(self, broadcast_queue, difficulty):
+    def __init__(self, send_queue, difficulty):
         self._difficulty = difficulty
-        super().__init__(broadcast_queue)
+        super().__init__(send_queue)
 
     def new_block(self, block):
+        if block.index > self.latest_block().index + 1:
+            # block higher then current chain:
+            # resolve conflict between chains
+            self.send_queue.put(('get_chain', '', 'broadcast'))
+            print('### DEBUG ### Chain out-of-date.')
+            print('### DEBUG ### Updating...')
+            return
+
         if self.validate_block(block, self.chain[-1]):
             self.transaction_pool = []
             # TODO: only remove transaction in new block
-            self.broadcast_queue.put(('new_block', block))
+            self.send_queue.put(('new_block', block, 'broadcast'))
             self.chain.append(block)
         else:
             print('### DEBUG ### Invalid block')
@@ -54,6 +62,24 @@ class PoW_Blockchain(Blockchain):
         test_proof = f'{last_proof}{proof}'.encode()
         test_hash = self.hash(test_proof)
         return test_hash[:self._difficulty] == '0' * self._difficulty
+
+    def resolve_conflict(self, new_chain):
+        print('### DEBUG ### Resolving conflict')
+        if len(self.chain) < len(new_chain):
+            # Validate new chain:
+            last_block = new_chain[0]
+            current_index = 1
+            while current_index < len(new_chain):
+                block = new_chain[current_index]
+                if not self.validate_block(block, last_block):
+                    print('### DEBUG ### Conflict resolved (old chain)')
+                    return
+                last_block = block
+                current_index += 1
+            self.chain = new_chain
+            print('### DEBUG ### Conflict resolved (new chain)')
+        else:
+            print('### DEBUG ### Conflict resolved (old chain)')
 
     @property
     def difficulty(self):

@@ -30,24 +30,20 @@ help: prints commands\
 transaction \<from> \<to> \<amount> : Create transaction \
 mine: mine a new block \
 dump: print blockchain \
+peers: print peers \
 exit: exits programm
 
 # Information
 ## Internal communication
 Internal communication (between threads) of the blockchain is handled via two Queues \
 Communication happens between Blockchain<->Networking and CLI<->Blockchain
-### broadcast_queue
-Blockchain -> Networking (-> all nodes)
-
-Message types
-* new_block
-* new_transaction
+### send_queue
+Blockchain -> Networking (-> one/all nodes)
 
 ### receive_queue
 Networking -> Blockchain \
 CLI -> Blockchain
 
-Message types
-* new_block
-* new_transaction
-* mine
+## Networking protocol
+Messages are serialized via pythons _pickle_ module \
+Messages contain a message-type and message-data

@@ -11,13 +11,13 @@ Block = namedtuple('Block', ['index', 'timestamp',
 class Blockchain (object):
     """ Abstract class of a blockchain
     Arguments:
-    broadcast_queue -> Queue for messages to other nodes
+    send_queue -> Queue for messages to other nodes
     """
 
-    def __init__(self, broadcast_queue):
+    def __init__(self, send_queue):
         self.chain = []
         self.transaction_pool = []
-        self.broadcast_queue = broadcast_queue
+        self.send_queue = send_queue
         self.load_chain()
 
     def load_chain(self):
@@ -25,7 +25,7 @@ class Blockchain (object):
 
         # If file doesn't exist / is empty:
         # Create genesis block
-        self.chain.append(Block(0, 0, [], 0, 0))
+        self.chain.append(Block(0, 768894480, [], 0, 0))
 
     def new_transaction(self, transaction):
         """ Add a new transaction to the blockchain
@@ -34,7 +34,7 @@ class Blockchain (object):
         """
         if self.validate_transaction(transaction):
             self.transaction_pool.append(transaction)
-            self.broadcast_queue.put(('new_transaction', transaction))
+            self.send_queue.put(('new_transaction', transaction, 'broadcast'))
         else:
             print('### DEBUG ### Invalid transaction')
 
@@ -43,10 +43,16 @@ class Blockchain (object):
         Arguments:
         block -> Type as namedtuple at the top of the file
         """
+        if block.index > self.latest_block().index + 1:
+            # block higher then current chain:
+            # resolve conflict between chains
+            self.send_queue(('resolve_conflict', self.chain, 'broadcast'))
+
         if self.validate_block(block):
             self.transaction_pool = []
+            # TODO: only remove transaction in new block
             self.chain.append(block)
-            self.broadcast_queue.put(('new_block', block))
+            self.send_queue.put(('new_block', block, 'broadcast'))
         else:
             print('### DEBUG ### Invalid block')
 
@@ -73,7 +79,7 @@ class Blockchain (object):
 
         Returns the create block
         """
-        block = Block(len(self.chain) + 1,
+        block = Block(len(self.chain),
                       time(),
                       self.transaction_pool,
                       proof,
@@ -89,11 +95,20 @@ class Blockchain (object):
         """
         raise NotImplementedError
 
-    def resolve_conflict(self):
+    def resolve_conflict(self, new_chain):
         """ Resolve conflict between to blockchains/forks
         Abstract function!
+        Arguments:
+        new_chain -> other blockchain to compare to
         """
         raise NotImplementedError
+
+    def latest_block(self):
+        """ Get the latest block
+
+        Returns the latest block on the chain
+        """
+        return self.chain[-1]
 
     @staticmethod
     def hash(data):
