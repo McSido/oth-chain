@@ -3,6 +3,10 @@ import sys
 import threading
 import getopt
 import time
+import nacl.encoding
+import nacl.signing
+import nacl.utils
+import hashlib
 from queue import Queue
 from pprint import pprint
 
@@ -96,6 +100,12 @@ def main(argv=sys.argv):
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
 
+    # Initialize signing (private) and verify (public) key
+    # TODO: Add saving/loading private key
+    signing_key = nacl.signing.SigningKey.generate()
+    verify_key = signing_key.verify_key
+    verify_key_hex = verify_key.encode(nacl.encoding.HexEncoder)
+
     # User Interaction
     while True:
         print('Action: ')
@@ -120,8 +130,12 @@ def main(argv=sys.argv):
             receive_queue.put(('mine', '', 'local'))
         elif re.fullmatch(r'transaction \w+ \w+ \d+', command):
             t = command.split(' ')
+            # Create new Transaction, sender = hex(public_key), signature = signed random number
+            timestamp = time.time()
+            hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3]) + str(timestamp)).encode()).hexdigest()
             receive_queue.put(('new_transaction',
-                               Transaction(t[1], t[2], int(t[3]), time.time()),
+                               Transaction(verify_key_hex, t[2], int(t[3]), timestamp,
+                                           signing_key.sign(hash.encode())),
                                'local'
                                ))
         elif command == 'dump':

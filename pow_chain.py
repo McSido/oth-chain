@@ -1,4 +1,8 @@
 import hashlib
+import nacl.signing
+import nacl.encoding
+
+from nacl.exceptions import BadSignatureError
 
 from blockchain import Block, Blockchain, Transaction
 
@@ -18,8 +22,10 @@ class PoW_Blockchain(Blockchain):
             return
 
         if self.validate_block(block, self.chain[-1]):
-            self.transaction_pool = []
-            # TODO: only remove transaction in new block
+            # remove transaction in new block from own transaction pool
+            for block_transaction in block.transactions:
+                if block_transaction in self.transaction_pool:
+                    self.transaction_pool.remove(block_transaction)
             self.send_queue.put(('new_block', block, 'broadcast'))
             self.chain.append(block)
         else:
@@ -32,11 +38,35 @@ class PoW_Blockchain(Blockchain):
         # check if the proof of the new block is valid
         if not self.validate_proof(last_block.proof, block.proof):
             return False
-        # TODO: validate all transactions
+        # validate all transactions
+        for transaction in block.transactions:
+            if not self.validate_transaction(transaction):
+                return False
         return True
 
     def validate_transaction(self, transaction):
-        return transaction not in self.transaction_pool
+        if transaction in self.transaction_pool:
+            return False
+        try:
+            verify_key = nacl.signing.VerifyKey(transaction.sender, encoder=nacl.encoding.HexEncoder)
+            transaction_hash = verify_key.verify(transaction.signature).decode()
+            validate_hash = hashlib.sha256(
+                (str(transaction.sender) + str(transaction.recipient) + str(transaction.amount) + str(transaction.timestamp)).encode()
+            ).hexdigest()
+
+            if validate_hash == transaction_hash:
+                print('### DEBUG ### Signature OK')
+                return True
+            else:
+                print('### DEBUG ### Wrong Hash')
+                return False
+
+            # TODO: check if enough money
+
+        except BadSignatureError:
+            print('### DEBUG ### Bad Signature, Validation Failed')
+            return False
+        # return transaction not in self.transaction_pool
         # TODO: check if transaction is valid (e.g. signed + enough money)
 
     def create_proof(self):

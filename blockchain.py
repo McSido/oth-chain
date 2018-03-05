@@ -3,7 +3,7 @@ from collections import namedtuple
 from time import time
 
 Transaction = namedtuple(
-    'Transaction', ['sender', 'recipient', 'amount', 'timestamp'])
+    'Transaction', ['sender', 'recipient', 'amount', 'timestamp', 'signature'])
 Block = namedtuple('Block', ['index', 'timestamp',
                              'transactions', 'proof', 'previous_hash'])
 
@@ -56,7 +56,7 @@ class Blockchain (object):
         else:
             print('### DEBUG ### Invalid block')
 
-    def validate_block(self, block):
+    def validate_block(self, block, last_block):
         """ Validate a block
         Abstract function!
         Arguments:
