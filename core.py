@@ -106,6 +106,8 @@ def main(argv=sys.argv):
                 mine
                 dump
                 peers
+                save
+                load
 
                 exit
                 """)
@@ -128,6 +130,10 @@ def main(argv=sys.argv):
             pprint(vars(my_blockchain))
         elif command == 'peers':
             pprint(networking.peer_list)  # TODO: threadsafe!!!
+        elif command == 'save':
+            pprint('not yet implemented')   # TODO: save to file
+        elif command == 'load':
+            pprint('not yet implemented')   #TODO: load from file
         else:
             print('Command not found!')
 
