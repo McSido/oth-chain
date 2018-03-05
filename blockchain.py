@@ -1,6 +1,9 @@
+import os
+import pickle
 import hashlib
 from collections import namedtuple
 from time import time
+from pathlib import Path
 
 Transaction = namedtuple(
     'Transaction', ['sender', 'recipient', 'amount', 'timestamp'])
@@ -22,10 +25,14 @@ class Blockchain (object):
 
     def load_chain(self):
         # TODO: Load preexisting blockchain from file
-
-        # If file doesn't exist / is empty:
-        # Create genesis block
-        self.chain.append(Block(0, 768894480, [], 0, 0))
+         if os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
+             print("### DEBUG ### load existing blockchain from file")
+             with open('bc_file.txt', 'rb') as input:
+                 self.chain = pickle.load(input)
+         else:
+            # If file doesn't exist / is empty:
+            # Create genesis block
+            self.chain.append(Block(0, 768894480, [], 0, 0))
 
     def new_transaction(self, transaction):
         """ Add a new transaction to the blockchain
