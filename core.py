@@ -3,6 +3,7 @@ import sys
 import threading
 import getopt
 import time
+import pickle
 from queue import Queue
 from pprint import pprint
 
@@ -106,7 +107,8 @@ def main(argv=sys.argv):
                 mine
                 dump
                 peers
-
+                save
+        
                 exit
                 """)
         elif command == 'exit':
@@ -128,6 +130,10 @@ def main(argv=sys.argv):
             pprint(vars(my_blockchain))
         elif command == 'peers':
             pprint(networking.peer_list)  # TODO: threadsafe!!!
+        elif command == 'save':
+            pprint('saving to file named bc_file.txt')
+            with open('bc_file.txt', 'wb') as output:
+                pickle.dump(my_blockchain.chain, output, pickle.HIGHEST_PROTOCOL)
         else:
             print('Command not found!')
 
