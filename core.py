@@ -7,6 +7,7 @@ import nacl.encoding
 import nacl.signing
 import nacl.utils
 import hashlib
+import pickle
 from queue import Queue
 from pprint import pprint
 
@@ -63,20 +64,44 @@ def blockchain_loop(blockchain):
         receive_msg(msg_type, msg_data, msg_address, blockchain)
 
 
+def load_key(filename):
+    """Attempts to load the private key from the provided file
+    """
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
+
+
+def save_key(key, filename):
+    """Attempts to save the private key to the provided file
+    """
+    with open(filename, 'wb') as f:
+        pickle.dump(key, f)
+
+
 def main(argv=sys.argv):
 
     port = 6666
+    signing_key = None
     try:
-        opts, args = getopt.getopt(argv[1:], 'hp=', ['help', 'port='])
+        opts, args = getopt.getopt(argv[1:], 'hp=k=', ['help', 'port=', 'key='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-p/--port to change default port')
+                print('-k/--key to load a private key from a file')
                 sys.exit()
             if o in ('-p', '--port'):
                 try:
                     port = int(a)
                 except:
                     print("Port was invalid (e.g. not an int)")
+            if o in ('-k', '--key'):
+                try:
+                    signing_key = load_key(filename=a)
+                    print('Key successfully loaded')
+                except Exception as e:
+                    print('Could not load Key / Key is invalid')
+                    print(e)
+
     except getopt.GetoptError as err:
         print('for help use --help')
         print(err)
@@ -101,8 +126,10 @@ def main(argv=sys.argv):
     send_queue.put(('get_newest_block', '', 'broadcast'))
 
     # Initialize signing (private) and verify (public) key
-    # TODO: Add saving/loading private key
-    signing_key = nacl.signing.SigningKey.generate()
+    if not signing_key:
+        print('No key was detected, generating private key')
+        signing_key = nacl.signing.SigningKey.generate()
+
     verify_key = signing_key.verify_key
     verify_key_hex = verify_key.encode(nacl.encoding.HexEncoder)
 
@@ -116,6 +143,7 @@ def main(argv=sys.argv):
                 mine
                 dump
                 peers
+                key <filename>
 
                 exit
                 """)
@@ -130,18 +158,27 @@ def main(argv=sys.argv):
             receive_queue.put(('mine', '', 'local'))
         elif re.fullmatch(r'transaction \w+ \w+ \d+', command):
             t = command.split(' ')
-            # Create new Transaction, sender = hex(public_key), signature = signed random number
+            # Create new Transaction, sender = hex(public_key), signature = signed hash of the transaction
             timestamp = time.time()
-            hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3]) + str(timestamp)).encode()).hexdigest()
+            transaction_hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3]) + str(timestamp)).encode())\
+                .hexdigest()
             receive_queue.put(('new_transaction',
                                Transaction(verify_key_hex, t[2], int(t[3]), timestamp,
-                                           signing_key.sign(hash.encode())),
+                                           signing_key.sign(transaction_hash.encode())),
                                'local'
                                ))
         elif command == 'dump':
             pprint(vars(my_blockchain))
         elif command == 'peers':
             pprint(networking.peer_list)  # TODO: threadsafe!!!
+        elif re.fullmatch(r'key \w+', command):
+            try:
+                t = command.split(' ')
+                save_key(signing_key, t[1])
+                print('Key saved successfully')
+            except Exception as e:
+                print('Could not save key')
+                print(e)
         else:
             print('Command not found!')
 
