@@ -81,7 +81,7 @@ class Blockchain (object):
         """
         block = Block(len(self.chain),
                       time(),
-                      self.transaction_pool,
+                      list(self.transaction_pool),
                       proof,
                       self.hash(self.chain[-1])
                       )

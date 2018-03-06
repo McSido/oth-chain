@@ -40,12 +40,12 @@ class PoW_Blockchain(Blockchain):
             return False
         # validate all transactions
         for transaction in block.transactions:
-            if not self.validate_transaction(transaction):
+            if not self.validate_transaction(transaction, mining=True):
                 return False
         return True
 
-    def validate_transaction(self, transaction):
-        if transaction in self.transaction_pool:
+    def validate_transaction(self, transaction, mining=False):
+        if transaction in self.transaction_pool and not mining:
             return False
         try:
             verify_key = nacl.signing.VerifyKey(transaction.sender, encoder=nacl.encoding.HexEncoder)
