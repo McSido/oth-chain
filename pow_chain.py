@@ -22,7 +22,7 @@ class PoW_Blockchain(Blockchain):
             return
 
         if self.validate_block(block, self.chain[-1]):
-            # remove transaction in new block from own transaction pool
+            # remove transactions in new block from own transaction pool
             for block_transaction in block.transactions:
                 if block_transaction in self.transaction_pool:
                     self.transaction_pool.remove(block_transaction)
@@ -47,6 +47,9 @@ class PoW_Blockchain(Blockchain):
     def validate_transaction(self, transaction, mining=False):
         if transaction in self.transaction_pool and not mining:
             return False
+        # For testing purposes only, should be changed along with the way mining rewards are handled
+        if transaction.sender == '0' and transaction.signature == '0':
+            return True
         try:
             verify_key = nacl.signing.VerifyKey(transaction.sender, encoder=nacl.encoding.HexEncoder)
             transaction_hash = verify_key.verify(transaction.signature).decode()
@@ -56,7 +59,12 @@ class PoW_Blockchain(Blockchain):
 
             if validate_hash == transaction_hash:
                 print('### DEBUG ### Signature OK')
-                return True
+                if self.check_balance(transaction.sender) >= transaction.amount:
+                    print('### DEBUG ### Balance sufficient, transaction is valid')
+                    return True
+                else:
+                    print('### DEBUG ### Balance insufficient, transaction is invalid')
+                    return False
             else:
                 print('### DEBUG ### Wrong Hash')
                 return False

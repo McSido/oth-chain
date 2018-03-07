@@ -41,6 +41,9 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     elif msg_type == 'mine' and msg_address == 'local':
         proof = blockchain.create_proof()
         block = blockchain.create_block(proof)
+        # Note that this is only a temporary solution, and should be changed for more security
+        blockchain.new_transaction(
+            Transaction(sender='0', recipient=msg_data, amount=50, timestamp=time.time(), signature='0'))
         blockchain.new_block(block)
 
     elif msg_type == 'get_newest_block':
@@ -155,7 +158,7 @@ def main(argv=sys.argv):
             networker.join()
             sys.exit()
         elif command == 'mine':
-            receive_queue.put(('mine', '', 'local'))
+            receive_queue.put(('mine', verify_key_hex, 'local'))
         elif re.fullmatch(r'transaction \w+ \w+ \d+', command):
             t = command.split(' ')
             # Create new Transaction, sender = hex(public_key), signature = signed hash of the transaction

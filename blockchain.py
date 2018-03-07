@@ -20,6 +20,22 @@ class Blockchain (object):
         self.send_queue = send_queue
         self.load_chain()
 
+    def check_balance(self, key):
+        """ Checks if a certain user (identified by key) has enough money
+            by iterating through the chain and checking the amounts of money
+            the user sent or received
+        Arguments:
+            key -> identifies the user
+        """
+        balance = 0
+        for block in self.chain:
+            for transaction in block.transactions:
+                if transaction.sender == key:
+                    balance -= transaction.amount
+                if transaction.recipient == key:
+                    balance += transaction.amount
+        return balance
+
     def load_chain(self):
         # TODO: Load preexisting blockchain from file
 
@@ -48,9 +64,10 @@ class Blockchain (object):
             # resolve conflict between chains
             self.send_queue(('resolve_conflict', self.chain, 'broadcast'))
 
-        if self.validate_block(block):
-            self.transaction_pool = []
-            # TODO: only remove transaction in new block
+        if self.validate_block(block, self.chain[:-1]):
+            for block_transaction in block.transactions:
+                if block_transaction in self.transaction_pool:
+                    self.transaction_pool.remove(block_transaction)
             self.chain.append(block)
             self.send_queue.put(('new_block', block, 'broadcast'))
         else:
