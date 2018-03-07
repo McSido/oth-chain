@@ -3,6 +3,10 @@ import sys
 import threading
 import getopt
 import time
+import nacl.encoding
+import nacl.signing
+import nacl.utils
+import hashlib
 import pickle
 from queue import Queue
 from pprint import pprint
@@ -35,7 +39,9 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
         blockchain.new_transaction(msg_data)
 
     elif msg_type == 'mine' and msg_address == 'local':
-        proof = blockchain.create_proof()
+        proof = blockchain.create_proof(msg_data)
+        blockchain.new_transaction(
+            Transaction(sender='0', recipient=msg_data, amount=50, timestamp=time.time(), signature='0'))
         block = blockchain.create_block(proof)
         blockchain.new_block(block)
 
@@ -60,20 +66,44 @@ def blockchain_loop(blockchain):
         receive_msg(msg_type, msg_data, msg_address, blockchain)
 
 
+def load_key(filename):
+    """Attempts to load the private key from the provided file
+    """
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
+
+
+def save_key(key, filename):
+    """Attempts to save the private key to the provided file
+    """
+    with open(filename, 'wb') as f:
+        pickle.dump(key, f)
+
+
 def main(argv=sys.argv):
 
     port = 6666
+    signing_key = None
     try:
-        opts, args = getopt.getopt(argv[1:], 'hp=', ['help', 'port='])
+        opts, args = getopt.getopt(argv[1:], 'hp=k=', ['help', 'port=', 'key='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-p/--port to change default port')
+                print('-k/--key to load a private key from a file')
                 sys.exit()
             if o in ('-p', '--port'):
                 try:
                     port = int(a)
                 except:
                     print("Port was invalid (e.g. not an int)")
+            if o in ('-k', '--key'):
+                try:
+                    signing_key = load_key(filename=a)
+                    print('Key successfully loaded')
+                except Exception as e:
+                    print('Could not load Key / Key is invalid')
+                    print(e)
+
     except getopt.GetoptError as err:
         print('for help use --help')
         print(err)
@@ -97,6 +127,14 @@ def main(argv=sys.argv):
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
 
+    # Initialize signing (private) and verify (public) key
+    if not signing_key:
+        print('No key was detected, generating private key')
+        signing_key = nacl.signing.SigningKey.generate()
+
+    verify_key = signing_key.verify_key
+    verify_key_hex = verify_key.encode(nacl.encoding.HexEncoder)
+
     # User Interaction
     while True:
         print('Action: ')
@@ -107,8 +145,8 @@ def main(argv=sys.argv):
                 mine
                 dump
                 peers
+                key <filename>
                 save
-        
                 exit
                 """)
         elif command == 'exit':
@@ -119,17 +157,30 @@ def main(argv=sys.argv):
             networker.join()
             sys.exit()
         elif command == 'mine':
-            receive_queue.put(('mine', '', 'local'))
+            receive_queue.put(('mine', verify_key_hex, 'local'))
         elif re.fullmatch(r'transaction \w+ \w+ \d+', command):
             t = command.split(' ')
+            # Create new Transaction, sender = hex(public_key), signature = signed hash of the transaction
+            timestamp = time.time()
+            transaction_hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3]) + str(timestamp)).encode())\
+                .hexdigest()
             receive_queue.put(('new_transaction',
-                               Transaction(t[1], t[2], int(t[3]), time.time()),
+                               Transaction(verify_key_hex, t[2], int(t[3]), timestamp,
+                                           signing_key.sign(transaction_hash.encode())),
                                'local'
                                ))
         elif command == 'dump':
             pprint(vars(my_blockchain))
         elif command == 'peers':
             pprint(networking.peer_list)  # TODO: threadsafe!!!
+        elif re.fullmatch(r'key \w+', command):
+            try:
+                t = command.split(' ')
+                save_key(signing_key, t[1])
+                print('Key saved successfully')
+            except Exception as e:
+                print('Could not save key')
+                print(e)
         elif command == 'save':
             pprint('saving to file named bc_file.txt')
             with open('bc_file.txt', 'wb') as output:
