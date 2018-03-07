@@ -48,6 +48,13 @@ class Blockchain (object):
         Arguments:
         transaction -> Type as namedtuple at the top of the file
         """
+        # Make sure, only one mining reward is granted per block
+        for pool_transaction in self.transaction_pool:
+            if pool_transaction.sender == '0' and pool_transaction.signature == '0':
+                print('### DEBUG ### This block already granted a mining transaction!')
+                return
+        if transaction in self.latest_block().transactions:
+            return
         if self.validate_transaction(transaction):
             self.transaction_pool.append(transaction)
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
@@ -104,7 +111,7 @@ class Blockchain (object):
                       )
         return block
 
-    def create_proof(self):
+    def create_proof(self, miner_key):
         """ Create a proof for a new block
         Abstract function!
 

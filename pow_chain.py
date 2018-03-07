@@ -36,7 +36,12 @@ class PoW_Blockchain(Blockchain):
         if block.previous_hash != self.hash(last_block):
             return False
         # check if the proof of the new block is valid
-        if not self.validate_proof(last_block.proof, block.proof):
+        mining_transaction = None
+        for transaction in self.transaction_pool:
+            if transaction.sender == '0' and transaction.signature == '0':
+                mining_transaction = transaction
+                break
+        if not self.validate_proof(last_block.proof, block.proof, mining_transaction.recipient):
             return False
         # validate all transactions
         for transaction in block.transactions:
@@ -47,7 +52,6 @@ class PoW_Blockchain(Blockchain):
     def validate_transaction(self, transaction, mining=False):
         if transaction in self.transaction_pool and not mining:
             return False
-        # For testing purposes only, should be changed along with the way mining rewards are handled
         if transaction.sender == '0' and transaction.signature == '0':
             return True
         try:
@@ -77,7 +81,7 @@ class PoW_Blockchain(Blockchain):
         # return transaction not in self.transaction_pool
         # TODO: check if transaction is valid (e.g. signed + enough money)
 
-    def create_proof(self):
+    def create_proof(self, miner_key):
         """ Create proof of work:
             Find a number that fullfills validate_proof()
             Can take some time, depending on blockchain difficulty
@@ -85,11 +89,11 @@ class PoW_Blockchain(Blockchain):
             Returns the proof
         """
         proof = 0
-        while self.validate_proof(self.chain[-1].proof, proof) is False:
+        while self.validate_proof(self.chain[-1].proof, proof, miner_key) is False:
             proof += 1
         return proof
 
-    def validate_proof(self, last_proof, proof):
+    def validate_proof(self, last_proof, proof, miner_key):
         """ Check if a proof is valid:
             A proof is valid if the hash of the combination of it combined
             with the previous proof has as many leading 0 as set by the
@@ -97,7 +101,7 @@ class PoW_Blockchain(Blockchain):
 
             Returns validity(True/False)
         """
-        test_proof = f'{last_proof}{proof}'.encode()
+        test_proof = f'{last_proof}{proof}{miner_key}'.encode()
         test_hash = self.hash(test_proof)
         return test_hash[:self._difficulty] == '0' * self._difficulty
 
