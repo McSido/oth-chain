@@ -35,7 +35,8 @@ def broadcast(msg_type, msg_data):
     msg_data -> Data of the message
     """
     for peer in active_peers:
-        send_msg(msg_type, msg_data, peer)
+        if peer != ('127.0.0.1', PORT):
+            send_msg(msg_type, msg_data, peer)
 
 
 def unpack_msg(msg):
@@ -111,8 +112,9 @@ def new_peer(address):
 
 def ping_peers():
     for p in peer_list:
-        unresponsive_peers.add(p)
-        send_msg('N_ping', '', p)
+        if p != ('127.0.0.1', PORT):
+            unresponsive_peers.add(p)
+            send_msg('N_ping', '', p)
 
 
 def load_initial_peers():
