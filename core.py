@@ -172,7 +172,10 @@ def main(argv=sys.argv):
         elif command == 'dump':
             pprint(vars(my_blockchain))
         elif command == 'peers':
+            print('all peers:')
             pprint(networking.peer_list)  # TODO: threadsafe!!!
+            print('active peers:')
+            pprint(networking.active_peers)  # TODO: threadsafe!!!
         elif re.fullmatch(r'key \w+', command):
             try:
                 t = command.split(' ')
