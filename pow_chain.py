@@ -37,7 +37,7 @@ class PoW_Blockchain(Blockchain):
             return False
         # check if the proof of the new block is valid
         mining_transaction = None
-        for transaction in self.transaction_pool:
+        for transaction in block.transactions:
             if transaction.sender == '0' and transaction.signature == '0':
                 mining_transaction = transaction
                 break

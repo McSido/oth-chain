@@ -36,13 +36,14 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
         blockchain.new_block(msg_data)
 
     elif msg_type == 'new_transaction':
-        blockchain.new_transaction(msg_data)
+        if not msg_data.sender == '0':
+            blockchain.new_transaction(msg_data)
 
     elif msg_type == 'mine' and msg_address == 'local':
         proof = blockchain.create_proof(msg_data)
-        blockchain.new_transaction(
-            Transaction(sender='0', recipient=msg_data, amount=50, timestamp=time.time(), signature='0'))
         block = blockchain.create_block(proof)
+        block.transactions.append(
+            Transaction(sender='0', recipient=msg_data, amount=50, timestamp=time.time(), signature='0'))
         blockchain.new_block(block)
 
     elif msg_type == 'get_newest_block':
