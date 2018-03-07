@@ -146,7 +146,7 @@ def main(argv=sys.argv):
                 dump
                 peers
                 key <filename>
-
+                save
                 exit
                 """)
         elif command == 'exit':
@@ -181,6 +181,10 @@ def main(argv=sys.argv):
             except Exception as e:
                 print('Could not save key')
                 print(e)
+        elif command == 'save':
+            pprint('saving to file named bc_file.txt')
+            with open('bc_file.txt', 'wb') as output:
+                pickle.dump(my_blockchain.chain, output, pickle.HIGHEST_PROTOCOL)
         else:
             print('Command not found!')
 
