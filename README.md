@@ -9,10 +9,7 @@ A Proof-of-Work blockchain that uses sha256 as the hashing-algorithm \
 Basic functionality implemented
 ## [networking.py](./networking-py)
 Responsible for all parts of the networking/P2P aspect of the blockchain \
-Currently uses UDP packages and is able to receive and send messages\
-Needs:
-* peer discovery
-* peer management (find/remove disconnected nodes)
+Uses UDP packages\
 ## [core.py](./core.py)
 Start of the blockchain \
 Responsible for the setup of the blockchain and networking system \
@@ -31,8 +28,15 @@ transaction \<from> \<to> \<amount> : Create transaction \
 mine: mine a new block \
 dump: print blockchain \
 peers: print peers \
+key \<filename> : Save current key to \<filename>\
+save: Save blockchain to bc_file.txt\
 exit: exits programm
 
+## Options
+```
+-p --port=<PORT>   Change port (default is 6666)
+-k --key=<PATH>    Load private key from file
+```
 # Information
 ## Internal communication
 Internal communication (between threads) of the blockchain is handled via two Queues \
