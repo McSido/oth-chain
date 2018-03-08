@@ -46,7 +46,7 @@ class Blockchain (object):
 
     def load_chain(self):
         # TODO: Load preexisting blockchain from file
-         if os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
+         if os.path.exists("bc_file.txt") and os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
              print("### DEBUG ### load existing blockchain from file")
              with open('bc_file.txt', 'rb') as input:
                  self.chain = pickle.load(input)
