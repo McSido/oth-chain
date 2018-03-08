@@ -7,7 +7,7 @@ Current implementations:
 * [pow_chain.py](./pow_chain.py)\
 A Proof-of-Work blockchain that uses sha256 as the hashing-algorithm \
 Basic functionality implemented
-## [networking.py](./networking-py)
+## [networking.py](./networking.py)
 Responsible for all parts of the networking/P2P aspect of the blockchain \
 Uses UDP packages\
 ## [core.py](./core.py)
