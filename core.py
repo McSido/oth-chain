@@ -11,6 +11,7 @@ import pickle
 import math
 from queue import Queue
 from pprint import pprint
+from GUI import *
 
 import blockchain
 import networking
@@ -152,6 +153,7 @@ def main(argv=sys.argv):
                 dump
                 peers
                 key <filename>
+                gui
                 save
                 exit
                 """)
@@ -194,6 +196,11 @@ def main(argv=sys.argv):
             pprint('saving to file named bc_file.txt')
             with open('bc_file.txt', 'wb') as output:
                 pickle.dump(my_blockchain.chain, output, pickle.HIGHEST_PROTOCOL)
+        elif command == 'gui':
+            print("open gui")
+            #app = QApplication(sys.argv)
+            #ex = ChainGUI()
+            #sys.exit(app.exec_())
         else:
             print('Command not found!')
 
