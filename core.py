@@ -8,6 +8,7 @@ import nacl.signing
 import nacl.utils
 import hashlib
 import pickle
+import math
 from queue import Queue
 from pprint import pprint
 
@@ -42,8 +43,12 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     elif msg_type == 'mine' and msg_address == 'local':
         proof = blockchain.create_proof(msg_data)
         block = blockchain.create_block(proof)
+        # Calculate the transaction fees - Maybe exclude transactions where the miner == the sender/recipient?
+        fee_sum = 0
+        for transaction in block.transactions:
+            fee_sum += math.ceil(0.05 * transaction.amount)
         block.transactions.append(
-            Transaction(sender='0', recipient=msg_data, amount=50, timestamp=time.time(), signature='0'))
+            Transaction(sender='0', recipient=msg_data, amount=50+fee_sum, timestamp=time.time(), signature='0'))
         blockchain.new_block(block)
 
     elif msg_type == 'get_newest_block':
