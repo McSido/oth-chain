@@ -23,7 +23,7 @@ class Blockchain (object):
         self.send_queue = send_queue
         self.load_chain()
 
-    def check_balance(self, key):
+    def check_balance(self, key, timestamp):
         """ Checks if a certain user (identified by key) has enough money
             by iterating through the chain and checking the amounts of money
             the user sent or received
@@ -37,15 +37,20 @@ class Blockchain (object):
                     balance -= transaction.amount
                 if transaction.recipient == key:
                     balance += transaction.amount
+        for transaction in self.transaction_pool:
+            if transaction.sender == key and transaction.timestamp < timestamp:
+                balance -= transaction.amount
+            if transaction.recipient == key and transaction.timestamp < timestamp:
+                balance += transaction.amount
         return balance
 
     def load_chain(self):
         # TODO: Load preexisting blockchain from file
-        # if os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
-        #     print("### DEBUG ### load existing blockchain from file")
-        #     with open('bc_file.txt', 'rb') as input:
-        #         self.chain = pickle.load(input)
-        # else:
+         if os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
+             print("### DEBUG ### load existing blockchain from file")
+             with open('bc_file.txt', 'rb') as input:
+                 self.chain = pickle.load(input)
+         else:
             # If file doesn't exist / is empty:
             # Create genesis block
             self.chain.append(Block(0, 768894480, [], 0, 0))

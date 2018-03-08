@@ -64,7 +64,7 @@ class PoW_Blockchain(Blockchain):
 
             if validate_hash == transaction_hash:
                 print('### DEBUG ### Signature OK')
-                if self.check_balance(transaction.sender) >= transaction.amount:
+                if self.check_balance(transaction.sender, transaction.timestamp) >= transaction.amount:
                     print('### DEBUG ### Balance sufficient, transaction is valid')
                     return True
                 else:
@@ -139,12 +139,11 @@ class PoW_Blockchain(Blockchain):
             difficulty = 1
         return difficulty
 
-
     @property
     def difficulty(self):
         """ Get current difficulty of the blockchain
         """
-        return self._difficulty
+        return self.scale_difficulty(self.chain[-1])
 
     @difficulty.setter
     def difficulty(self, difficulty):
