@@ -1,6 +1,7 @@
 import hashlib
 import nacl.signing
 import nacl.encoding
+import math
 
 from nacl.exceptions import BadSignatureError
 
@@ -41,7 +42,7 @@ class PoW_Blockchain(Blockchain):
             if transaction.sender == '0' and transaction.signature == '0':
                 mining_transaction = transaction
                 break
-        if not self.validate_proof(last_block.proof, block.proof, mining_transaction.recipient):
+        if not self.validate_proof(last_block, block.proof, mining_transaction.recipient):
             return False
         # validate all transactions
         for transaction in block.transactions:
@@ -89,11 +90,12 @@ class PoW_Blockchain(Blockchain):
             Returns the proof
         """
         proof = 0
-        while self.validate_proof(self.chain[-1].proof, proof, miner_key) is False:
+        last_block = self.chain[-1]
+        while self.validate_proof(last_block, proof, miner_key) is False:
             proof += 1
         return proof
 
-    def validate_proof(self, last_proof, proof, miner_key):
+    def validate_proof(self, last_block, proof, miner_key):
         """ Check if a proof is valid:
             A proof is valid if the hash of the combination of it combined
             with the previous proof has as many leading 0 as set by the
@@ -101,9 +103,10 @@ class PoW_Blockchain(Blockchain):
 
             Returns validity(True/False)
         """
-        test_proof = f'{last_proof}{proof}{miner_key}'.encode()
+        difficulty = self.scale_difficulty(last_block)
+        test_proof = f'{last_block.proof}{proof}{miner_key}'.encode()
         test_hash = self.hash(test_proof)
-        return test_hash[:self._difficulty] == '0' * self._difficulty
+        return test_hash[:difficulty] == '0' * difficulty
 
     def resolve_conflict(self, new_chain):
         print('### DEBUG ### Resolving conflict')
@@ -122,6 +125,20 @@ class PoW_Blockchain(Blockchain):
             print('### DEBUG ### Conflict resolved (new chain)')
         else:
             print('### DEBUG ### Conflict resolved (old chain)')
+
+    def scale_difficulty(self, last_block):
+        """ Example implementation of a scaling difficulty curve
+            Difficulty rises fast in the beginning and slower towards later blocks
+            reaching a difficulty of 4 at ~3k blocks and holding it until ~23k blocks
+            Arguments:
+                last_block -> difficulty is scaled upon the index of the last block
+        """
+        try:
+            difficulty = max(math.floor(math.log(last_block.index)/2), 1)
+        except ValueError:
+            difficulty = 1
+        return difficulty
+
 
     @property
     def difficulty(self):

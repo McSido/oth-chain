@@ -41,11 +41,11 @@ class Blockchain (object):
 
     def load_chain(self):
         # TODO: Load preexisting blockchain from file
-         if os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
-             print("### DEBUG ### load existing blockchain from file")
-             with open('bc_file.txt', 'rb') as input:
-                 self.chain = pickle.load(input)
-         else:
+        # if os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
+        #     print("### DEBUG ### load existing blockchain from file")
+        #     with open('bc_file.txt', 'rb') as input:
+        #         self.chain = pickle.load(input)
+        # else:
             # If file doesn't exist / is empty:
             # Create genesis block
             self.chain.append(Block(0, 768894480, [], 0, 0))
