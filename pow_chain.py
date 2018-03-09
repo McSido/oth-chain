@@ -51,6 +51,9 @@ class PoW_Blockchain(Blockchain):
         return True
 
     def validate_transaction(self, transaction, mining=False):
+        if not transaction.amount > 0:
+            print(f'### DEBUG ### Received transaction with amount {transaction.amount} lower or equal to zero')
+            return False
         if transaction in self.transaction_pool and not mining:
             return False
         if transaction.sender == '0' and transaction.signature == '0':

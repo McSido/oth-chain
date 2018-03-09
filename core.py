@@ -38,6 +38,7 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
         blockchain.new_block(msg_data)
 
     elif msg_type == 'new_transaction':
+        # ignore mining transactions (those are stored immediately in the mined block)
         if not msg_data.sender == '0':
             blockchain.new_transaction(msg_data)
 
@@ -169,6 +170,9 @@ def main(argv=sys.argv):
         elif re.fullmatch(r'transaction \w+ \w+ \d+', command):
             t = command.split(' ')
             # Create new Transaction, sender = hex(public_key), signature = signed hash of the transaction
+            if not int(t[3]) > 0:
+                print('Transactions must contain a amount greater than zero!')
+                continue
             timestamp = time.time()
             transaction_hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3]) + str(timestamp)).encode())\
                 .hexdigest()
