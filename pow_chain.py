@@ -51,6 +51,9 @@ class PoW_Blockchain(Blockchain):
         return True
 
     def validate_transaction(self, transaction, mining=False):
+        if not transaction.amount > 0:
+            print(f'### DEBUG ### Received transaction with amount {transaction.amount} lower or equal to zero')
+            return False
         if transaction in self.transaction_pool and not mining:
             return False
         if transaction.sender == '0' and transaction.signature == '0':
@@ -59,28 +62,27 @@ class PoW_Blockchain(Blockchain):
             verify_key = nacl.signing.VerifyKey(transaction.sender, encoder=nacl.encoding.HexEncoder)
             transaction_hash = verify_key.verify(transaction.signature).decode()
             validate_hash = hashlib.sha256(
-                (str(transaction.sender) + str(transaction.recipient) + str(transaction.amount) + str(transaction.timestamp)).encode()
+                (str(transaction.sender) + str(transaction.recipient) + str(transaction.amount) + str(transaction.fee)
+                 + str(transaction.timestamp)).encode()
             ).hexdigest()
 
             if validate_hash == transaction_hash:
                 print('### DEBUG ### Signature OK')
-                if self.check_balance(transaction.sender, transaction.timestamp) >= transaction.amount:
+                balance = self.check_balance(transaction.sender, transaction.timestamp)
+                if balance >= transaction.amount + transaction.fee:
                     print('### DEBUG ### Balance sufficient, transaction is valid')
                     return True
                 else:
                     print('### DEBUG ### Balance insufficient, transaction is invalid')
+                    print(f'Transaction at fault: {transaction} was not covered by balance: {balance}')
                     return False
             else:
                 print('### DEBUG ### Wrong Hash')
                 return False
 
-            # TODO: check if enough money
-
         except BadSignatureError:
             print('### DEBUG ### Bad Signature, Validation Failed')
             return False
-        # return transaction not in self.transaction_pool
-        # TODO: check if transaction is valid (e.g. signed + enough money)
 
     def create_proof(self, miner_key):
         """ Create proof of work:
@@ -112,16 +114,20 @@ class PoW_Blockchain(Blockchain):
         print('### DEBUG ### Resolving conflict')
         if len(self.chain) < len(new_chain):
             # Validate new chain:
+            # store old chain, and set self.chain to new_chain (needed for check_balance)
+            old_chain = list(self.chain)
+            self.chain = new_chain
             last_block = new_chain[0]
             current_index = 1
             while current_index < len(new_chain):
                 block = new_chain[current_index]
                 if not self.validate_block(block, last_block):
                     print('### DEBUG ### Conflict resolved (old chain)')
+                    self.chain = old_chain
                     return
                 last_block = block
                 current_index += 1
-            self.chain = new_chain
+            # self.chain = new_chain
             print('### DEBUG ### Conflict resolved (new chain)')
         else:
             print('### DEBUG ### Conflict resolved (old chain)')

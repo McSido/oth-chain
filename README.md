@@ -24,11 +24,14 @@ CLI loop
 
 ## Commands
 help: prints commands\
-transaction \<from> \<to> \<amount> : Create transaction \
+transaction \<to> \<amount> : Create transaction \
 mine: mine a new block \
 dump: print blockchain \
 peers: print peers \
 key \<filename> : Save current key to \<filename>\
+import \<key> \<name> : Imports a public key associated with \<name> from file \<file> to the keystore
+deletekey \<name> : Deletes key associated with \<name> from keystore
+export \<filename> : Exports one own public key to file \<filename>
 save: Save blockchain to bc_file.txt\
 exit: exits programm
 
@@ -36,6 +39,7 @@ exit: exits programm
 ```
 -p --port=<PORT>   Change port (default is 6666)
 -k --key=<PATH>    Load private key from file
+-s --store=<PATH>  Sets the name of the keystore file for saving and loading the keystore, defaults to 'keystore'
 ```
 # Information
 ## Internal communication
