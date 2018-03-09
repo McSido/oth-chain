@@ -24,6 +24,8 @@ from pow_chain import Block, PoW_Blockchain, Transaction
 #  blockchain
 send_queue = Queue()
 receive_queue = Queue()
+keystore = dict()
+keystore_filename = 'keystore'
 
 
 def receive_msg(msg_type, msg_data, msg_address, blockchain):
@@ -88,28 +90,75 @@ def save_key(key, filename):
         pickle.dump(key, f)
 
 
+def save_keystore():
+    with open(keystore_filename, 'wb') as f:
+        pickle.dump(keystore, f)
+
+
+def load_keystore():
+    with open(keystore_filename, 'rb') as f:
+        global keystore
+        keystore = pickle.load(f)
+
+
+def resolve_name(name):
+    try:
+        return keystore[name]
+    except KeyError:
+        print('### DEBUG ### Unknown name')
+        return 'Error'
+
+
+def add_to_keystore(name, key):
+    try:
+        if keystore[name]:
+            print('### DEBUG ### Name already exists, use update if you want to change the respective key')
+            return
+    except KeyError:
+        keystore[name] = key
+    save_keystore()
+
+
+def update_keystore(name, key):
+    if key == '':
+        keystore.pop(name)
+    keystore[name] = key
+    save_keystore()
+
+
 def main(argv=sys.argv):
 
     port = 6666
     signing_key = None
     try:
-        opts, args = getopt.getopt(argv[1:], 'hp=k=', ['help', 'port=', 'key='])
+        opts, args = getopt.getopt(argv[1:], 'hp=k=s=', ['help', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-p/--port to change default port')
                 print('-k/--key to load a private key from a file')
+                print('-s/--store to load a keystore from a file')
                 sys.exit()
             if o in ('-p', '--port'):
                 try:
                     port = int(a)
                 except:
                     print("Port was invalid (e.g. not an int)")
-            if o in ('-k', '--key'):
+            elif o in ('-k', '--key'):
                 try:
                     signing_key = load_key(filename=a)
                     print('Key successfully loaded')
                 except Exception as e:
                     print('Could not load Key / Key is invalid')
+                    print(e)
+            elif o in ('-s', '--store'):
+                global keystore_filename
+                keystore_filename = a
+                print(keystore_filename)
+                try:
+                    load_keystore()
+                    print('Keystore successfully loaded')
+                except Exception as e:
+                    print('Could not load Keystore')
                     print(e)
 
     except getopt.GetoptError as err:
@@ -155,31 +204,37 @@ def main(argv=sys.argv):
                 peers
                 key <filename>
                 gui
+                import <key> <name>
+                deletekey <name>
+                export <filename>
                 save
                 exit
                 """)
         elif command == 'exit':
             receive_queue.put(('exit', '', 'local'))
             send_queue.put(None)
-
+            save_keystore()
             blockchain_thread.join()
             networker.join()
             sys.exit()
         elif command == 'mine':
             receive_queue.put(('mine', verify_key_hex, 'local'))
-        elif re.fullmatch(r'transaction \w+ \w+ \d+', command):
+        elif re.fullmatch(r'transaction \w+ \d+', command):
             t = command.split(' ')
             # Create new Transaction, sender = hex(public_key), signature = signed hash of the transaction
-            if not int(t[3]) > 0:
+            if not int(t[2]) > 0:
                 print('Transactions must contain a amount greater than zero!')
+                continue
+            recipient = resolve_name(t[1])
+            if recipient == 'Error':
                 continue
             timestamp = time.time()
             # fee equals 5% of the transaction amount - at least 1
-            fee = math.ceil(int(t[3]) * 0.05)
-            transaction_hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3])
+            fee = math.ceil(int(t[2]) * 0.05)
+            transaction_hash = hashlib.sha256((str(verify_key_hex) + str(recipient) + str(t[2])
                                                + str(fee) + str(timestamp)).encode()).hexdigest()
             receive_queue.put(('new_transaction',
-                               Transaction(verify_key_hex, t[2], int(t[3]), fee, timestamp,
+                               Transaction(verify_key_hex, recipient, int(t[2]), fee, timestamp,
                                            signing_key.sign(transaction_hash.encode())),
                                'local'
                                ))
@@ -197,6 +252,35 @@ def main(argv=sys.argv):
                 print('Key saved successfully')
             except Exception as e:
                 print('Could not save key')
+                print(e)
+        elif re.fullmatch(r'import \w+ \w+', command):
+            try:
+                t = command.split(' ')
+                if resolve_name(t[2]):
+                    update_keystore(t[2], load_key(t[1]))
+                else:
+                    print('importing public key')
+                    add_to_keystore(t[1], load_key(t[1]))
+            except Exception as e:
+                print('Could not import key')
+                print(e)
+        elif re.fullmatch(r'deletekey \w+', command):
+            try:
+                t = command.split(' ')
+                if resolve_name(t[1]):
+                    update_keystore(t[1], '')
+                else:
+                    print(f'Could not delete {t[1]} from keystore. Was it spelt right?')
+            except Exception as e:
+                print('Could not delete key')
+                print(e)
+        elif re.fullmatch(r'export \w+', command):
+            try:
+                print('Exporting public key')
+                t = command.split(' ')
+                save_key(verify_key_hex, t[1])
+            except Exception as e:
+                print('Could not export public key')
                 print(e)
         elif command == 'save':
             pprint('saving to file named bc_file.txt')
