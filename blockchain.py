@@ -23,7 +23,7 @@ class Blockchain (object):
         self.send_queue = send_queue
         self.load_chain()
 
-    def check_balance(self, key):
+    def check_balance(self, key, timestamp):
         """ Checks if a certain user (identified by key) has enough money
             by iterating through the chain and checking the amounts of money
             the user sent or received
@@ -37,6 +37,11 @@ class Blockchain (object):
                     balance -= transaction.amount
                 if transaction.recipient == key:
                     balance += transaction.amount
+        for transaction in self.transaction_pool:
+            if transaction.sender == key and transaction.timestamp < timestamp:
+                balance -= transaction.amount
+            if transaction.recipient == key and transaction.timestamp < timestamp:
+                balance += transaction.amount
         return balance
 
     def load_chain(self):
