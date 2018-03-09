@@ -48,9 +48,9 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
         # Calculate the transaction fees - Maybe exclude transactions where the miner == the sender/recipient?
         fee_sum = 0
         for transaction in block.transactions:
-            fee_sum += math.ceil(0.05 * transaction.amount)
+            fee_sum += transaction.fee
         block.transactions.append(
-            Transaction(sender='0', recipient=msg_data, amount=50+fee_sum, timestamp=time.time(), signature='0'))
+            Transaction(sender='0', recipient=msg_data, amount=50+fee_sum, fee=0, timestamp=time.time(), signature='0'))
         blockchain.new_block(block)
 
     elif msg_type == 'get_newest_block':
@@ -174,10 +174,12 @@ def main(argv=sys.argv):
                 print('Transactions must contain a amount greater than zero!')
                 continue
             timestamp = time.time()
-            transaction_hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3]) + str(timestamp)).encode())\
-                .hexdigest()
+            # fee equals 5% of the transaction amount - at least 1
+            fee = math.ceil(int(t[3]) * 0.05)
+            transaction_hash = hashlib.sha256((str(verify_key_hex) + str(t[2]) + str(t[3])
+                                               + str(fee) + str(timestamp)).encode()).hexdigest()
             receive_queue.put(('new_transaction',
-                               Transaction(verify_key_hex, t[2], int(t[3]), timestamp,
+                               Transaction(verify_key_hex, t[2], int(t[3]), fee, timestamp,
                                            signing_key.sign(transaction_hash.encode())),
                                'local'
                                ))

@@ -6,7 +6,7 @@ from time import time
 from pathlib import Path
 
 Transaction = namedtuple(
-    'Transaction', ['sender', 'recipient', 'amount', 'timestamp', 'signature'])
+    'Transaction', ['sender', 'recipient', 'amount', 'fee', 'timestamp', 'signature'])
 Block = namedtuple('Block', ['index', 'timestamp',
                              'transactions', 'proof', 'previous_hash'])
 
@@ -34,12 +34,12 @@ class Blockchain (object):
         for block in self.chain:
             for transaction in block.transactions:
                 if transaction.sender == key:
-                    balance -= transaction.amount
+                    balance -= transaction.amount + transaction.fee
                 if transaction.recipient == key:
                     balance += transaction.amount
         for transaction in self.transaction_pool:
             if transaction.sender == key and transaction.timestamp < timestamp:
-                balance -= transaction.amount
+                balance -= transaction.amount + transaction.fee
             if transaction.recipient == key and transaction.timestamp < timestamp:
                 balance += transaction.amount
         return balance
