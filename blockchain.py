@@ -4,6 +4,7 @@ import hashlib
 from collections import namedtuple
 from time import time
 from pathlib import Path
+from utils import print_debug_info
 
 Transaction = namedtuple(
     'Transaction', ['sender', 'recipient', 'amount', 'fee', 'timestamp', 'signature'])
@@ -47,7 +48,7 @@ class Blockchain (object):
     def load_chain(self):
         # TODO: Load preexisting blockchain from file
          if os.path.exists("bc_file.txt") and os.stat("bc_file.txt").st_size != 0 and Path('bc_file.txt').is_file():
-             print("### DEBUG ### load existing blockchain from file")
+             print_debug_info("### DEBUG ### load existing blockchain from file")
              with open('bc_file.txt', 'rb') as input:
                  self.chain = pickle.load(input)
          else:
@@ -63,7 +64,7 @@ class Blockchain (object):
         # Make sure, only one mining reward is granted per block
         for pool_transaction in self.transaction_pool:
             if pool_transaction.sender == '0' and pool_transaction.signature == '0':
-                print('### DEBUG ### This block already granted a mining transaction!')
+                print_debug_info('### DEBUG ### This block already granted a mining transaction!')
                 return
         if transaction in self.latest_block().transactions:
             return
@@ -71,7 +72,7 @@ class Blockchain (object):
             self.transaction_pool.append(transaction)
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
         else:
-            print('### DEBUG ### Invalid transaction')
+            print_debug_info('### DEBUG ### Invalid transaction')
 
     def new_block(self, block):
         """ Add a new block to the blockchain
@@ -90,7 +91,7 @@ class Blockchain (object):
             self.chain.append(block)
             self.send_queue.put(('new_block', block, 'broadcast'))
         else:
-            print('### DEBUG ### Invalid block')
+            print_debug_info('### DEBUG ### Invalid block')
 
     def validate_block(self, block, last_block):
         """ Validate a block

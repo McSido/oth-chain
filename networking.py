@@ -5,6 +5,7 @@ import time
 import sys
 from queue import Empty
 from pprint import pprint
+from utils import print_debug_info
 
 from blockchain import Block, Transaction
 
@@ -86,7 +87,7 @@ def process_incoming_msg(msg, in_address, receive_queue):
     receive_queue -> Queue for communication with the blockchain
     """
     msg_type, msg_data = unpack_msg(msg)
-    print('### DEBUG ### received: ' + msg_type)
+    print_debug_info('### DEBUG ### received: ' + msg_type)
     if msg_type.startswith('N_'):
         # networking messages
         if msg_type == 'N_new_peer':
@@ -251,7 +252,7 @@ def worker(send_queue, receive_queue, command_queue, port=6666):
     send_queue -> Queue for messages to other nodes
     receive_queue -> Queue for messages to the attached blockchain
     """
-    print("### DEBUG ### Started networking")
+    print_debug_info("### DEBUG ### Started networking")
     # Example:
     # Find peers
     # Main loop:

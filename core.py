@@ -16,6 +16,7 @@ from GUI import *
 import blockchain
 import networking
 from pow_chain import Block, PoW_Blockchain, Transaction
+from utils import print_debug_info, set_debug
 
 # Create queues for message transfer blockchain<->networking
 # Every message on the send_queue should be sent to all connected
@@ -76,7 +77,7 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
 def blockchain_loop(blockchain):
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
-        print('### DEBUG ### Processing: ' + msg_type)
+        print_debug_info('### DEBUG ### Processing: ' + msg_type)
         receive_msg(msg_type, msg_data, msg_address, blockchain)
 
 
@@ -109,14 +110,14 @@ def resolve_name(name):
     try:
         return keystore[name]
     except KeyError:
-        print('### DEBUG ### Unknown name')
+        print_debug_info('### DEBUG ### Unknown name')
         return 'Error'
 
 
 def add_to_keystore(name, key):
     try:
         if keystore[name]:
-            print('### DEBUG ### Name already exists, use update if you want to change the respective key')
+            print('Name already exists, use update if you want to change the respective key')
             return
     except KeyError:
         keystore[name] = key
@@ -135,13 +136,16 @@ def main(argv=sys.argv):
     port = 6666
     signing_key = None
     try:
-        opts, args = getopt.getopt(argv[1:], 'hp=k=s=', ['help', 'port=', 'key=', 'store='])
+        opts, args = getopt.getopt(argv[1:], 'hdp=k=s=', ['help',  'debug', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
+                print('-d/--debug to enable debug prints')
                 print('-p/--port to change default port')
                 print('-k/--key to load a private key from a file')
                 print('-s/--store to load a keystore from a file')
                 sys.exit()
+            if o in ('-d', '--debug'):
+                set_debug()
             if o in ('-p', '--port'):
                 try:
                     port = int(a)
