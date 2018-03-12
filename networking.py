@@ -4,6 +4,7 @@ import socket
 import time
 import sys
 from queue import Empty
+from pprint import pprint
 
 from blockchain import Block, Transaction
 
@@ -147,7 +148,7 @@ def load_initial_peers():
             peer_list.add((p[0], int(p[1])))
 
 
-def example_worker(send_queue, receive_queue):
+def example_worker(send_queue, receive_queue, command_queue):
     """ Simple example of a networker
     Arguments:
     send_queue -> Queue for messages to other nodes
@@ -162,6 +163,15 @@ def example_worker(send_queue, receive_queue):
 
     # Main loop
     while True:
+        try:
+            cmd = command_queue.get(block=False)
+            if cmd == 'print_peers':
+                print('all peers:')
+                pprint(peer_list)
+                print('active peers:')
+                pprint(active_peers)
+        except Empty:
+            pass
         try:
             msg = send_queue.get(block=False)
             if msg is None:
@@ -235,7 +245,7 @@ def example_worker(send_queue, receive_queue):
         # (https://stackoverflow.com/questions/29082268/python-time-sleep-vs-event-wait)
 
 
-def worker(send_queue, receive_queue, port=6666):
+def worker(send_queue, receive_queue, command_queue, port=6666):
     """ Takes care of the communication between nodes
     Arguments:
     send_queue -> Queue for messages to other nodes
@@ -255,4 +265,4 @@ def worker(send_queue, receive_queue, port=6666):
     server_socket.bind(('', PORT))
     server_socket.settimeout(0.01)
 
-    example_worker(send_queue, receive_queue)
+    example_worker(send_queue, receive_queue, command_queue)

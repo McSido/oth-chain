@@ -24,6 +24,7 @@ from pow_chain import Block, PoW_Blockchain, Transaction
 #  blockchain
 send_queue = Queue()
 receive_queue = Queue()
+networker_command_queue = Queue()
 keystore = dict()
 keystore_filename = 'keystore'
 
@@ -175,7 +176,7 @@ def main(argv=sys.argv):
     # Create networking thread
     networker = threading.Thread(
         target=networking.worker,
-        args=(send_queue, receive_queue, port))
+        args=(send_queue, receive_queue, networker_command_queue, port))
     networker.start()
 
     # Main blockchain loop
@@ -247,10 +248,7 @@ def main(argv=sys.argv):
         elif command == 'dump':
             pprint(vars(my_blockchain))
         elif command == 'peers':
-            print('all peers:')
-            pprint(networking.peer_list)  # TODO: threadsafe!!!
-            print('active peers:')
-            pprint(networking.active_peers)  # TODO: threadsafe!!!
+            networker_command_queue.put('print_peers')
         elif re.fullmatch(r'key \w+', command):
             try:
                 t = command.split(' ')
