@@ -112,7 +112,8 @@ def resolve_name(name):
 def add_to_keystore(name, key):
     try:
         if keystore[name]:
-            print('### DEBUG ### Name already exists, use update if you want to change the respective key')
+            print(
+                '### DEBUG ### Name already exists, use update if you want to change the respective key')
             return
     except KeyError:
         keystore[name] = key
@@ -131,7 +132,8 @@ def main(argv=sys.argv):
     port = 6666
     signing_key = None
     try:
-        opts, args = getopt.getopt(argv[1:], 'hp=k=s=', ['help', 'port=', 'key=', 'store='])
+        opts, args = getopt.getopt(argv[1:], 'hp=k=s=', [
+                                   'help', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-p/--port to change default port')
@@ -198,17 +200,17 @@ def main(argv=sys.argv):
         command = input()
         if command == 'help':
             print(""" Available commands:
-                transaction <from> <to> <amount>
-                mine
-                dump
-                peers
-                key <filename>
-                gui
-                import <key> <name>
-                deletekey <name>
-                export <filename>
-                save
-                exit
+                help: prints commands
+                transaction <to> <amount> : Create transaction
+                mine: mine a new block
+                dump: print blockchain
+                peers: print peers
+                key <filename> : Save current key to <filename>
+                import <key> <name> : Imports a public key associated with <name> from file <file> to the keystore
+                deletekey <name> : Deletes key associated with <name> from keystore
+                export <filename> : Exports one own public key to file <filename>
+                save: Save blockchain to bc_file.txt
+                exit: exits programm
                 """)
         elif command == 'exit':
             receive_queue.put(('exit', '', 'local'))
@@ -270,7 +272,8 @@ def main(argv=sys.argv):
                 if resolve_name(t[1]):
                     update_keystore(t[1], '')
                 else:
-                    print(f'Could not delete {t[1]} from keystore. Was it spelt right?')
+                    print(
+                        f'Could not delete {t[1]} from keystore. Was it spelt right?')
             except Exception as e:
                 print('Could not delete key')
                 print(e)
@@ -285,12 +288,13 @@ def main(argv=sys.argv):
         elif command == 'save':
             pprint('saving to file named bc_file.txt')
             with open('bc_file.txt', 'wb') as output:
-                pickle.dump(my_blockchain.chain, output, pickle.HIGHEST_PROTOCOL)
+                pickle.dump(my_blockchain.chain, output,
+                            pickle.HIGHEST_PROTOCOL)  # Threadsafe?
         elif command == 'gui':
             print("open gui")
             #app = QApplication(sys.argv)
             #ex = ChainGUI()
-            #sys.exit(app.exec_())
+            # sys.exit(app.exec_())
         else:
             print('Command not found!')
 
