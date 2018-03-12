@@ -65,6 +65,9 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     elif msg_type == 'resolve_conflict':
         blockchain.resolve_conflict(msg_data)
 
+    elif msg_type == 'print_balance':
+        print(f'Current Balance: {blockchain.check_balance(msg_data[0], msg_data[1])}')
+
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
 
@@ -196,6 +199,8 @@ def main(argv=sys.argv):
     while True:
         print('Action: ')
         command = input()
+        command = command.lower().strip()
+        command = re.sub(r'\s\s*', ' ', command)
         if command == 'help':
             print(""" Available commands:
                 transaction <from> <to> <amount>
@@ -207,6 +212,7 @@ def main(argv=sys.argv):
                 import <key> <name>
                 deletekey <name>
                 export <filename>
+                balance [<name>]
                 save
                 exit
                 """)
@@ -282,6 +288,18 @@ def main(argv=sys.argv):
             except Exception as e:
                 print('Could not export public key')
                 print(e)
+        elif command == 'balance':
+            receive_queue.put(('print_balance',
+                              (verify_key_hex, time.time()),
+                              'local'))
+        elif re.fullmatch(r'balance \w+', command):
+            t = command.split(' ')
+            account = resolve_name(t[1])
+            if not account == 'Error':
+                receive_queue.put(('print_balance',
+                                   (account, time.time()),
+                                   'local'
+                                   ))
         elif command == 'save':
             pprint('saving to file named bc_file.txt')
             with open('bc_file.txt', 'wb') as output:
