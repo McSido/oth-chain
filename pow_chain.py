@@ -6,6 +6,7 @@ import math
 from nacl.exceptions import BadSignatureError
 
 from blockchain import Block, Blockchain, Transaction
+from utils import print_debug_info
 
 
 class PoW_Blockchain(Blockchain):
@@ -18,8 +19,8 @@ class PoW_Blockchain(Blockchain):
             # block higher then current chain:
             # resolve conflict between chains
             self.send_queue.put(('get_chain', '', 'broadcast'))
-            print('### DEBUG ### Chain out-of-date.')
-            print('### DEBUG ### Updating...')
+            print_debug_info('### DEBUG ### Chain out-of-date.')
+            print_debug_info('### DEBUG ### Updating...')
             return
 
         if self.validate_block(block, self.chain[-1]):
@@ -30,7 +31,7 @@ class PoW_Blockchain(Blockchain):
             self.send_queue.put(('new_block', block, 'broadcast'))
             self.chain.append(block)
         else:
-            print('### DEBUG ### Invalid block')
+            print_debug_info('### DEBUG ### Invalid block')
 
     def validate_block(self, block, last_block):
         # check if the hash of the new block is valid
@@ -52,7 +53,7 @@ class PoW_Blockchain(Blockchain):
 
     def validate_transaction(self, transaction, mining=False):
         if not transaction.amount > 0:
-            print(f'### DEBUG ### Received transaction with amount {transaction.amount} lower or equal to zero')
+            print_debug_info(f'### DEBUG ### Received transaction with amount {transaction.amount} lower or equal to zero')
             return False
         if transaction in self.transaction_pool and not mining:
             return False
@@ -67,21 +68,21 @@ class PoW_Blockchain(Blockchain):
             ).hexdigest()
 
             if validate_hash == transaction_hash:
-                print('### DEBUG ### Signature OK')
+                print_debug_info('### DEBUG ### Signature OK')
                 balance = self.check_balance(transaction.sender, transaction.timestamp)
                 if balance >= transaction.amount + transaction.fee:
-                    print('### DEBUG ### Balance sufficient, transaction is valid')
+                    print_debug_info('### DEBUG ### Balance sufficient, transaction is valid')
                     return True
                 else:
-                    print('### DEBUG ### Balance insufficient, transaction is invalid')
-                    print(f'Transaction at fault: {transaction} was not covered by balance: {balance}')
+                    print_debug_info('### DEBUG ### Balance insufficient, transaction is invalid')
+                    print_debug_info(f'Transaction at fault: {transaction} was not covered by balance: {balance}')
                     return False
             else:
-                print('### DEBUG ### Wrong Hash')
+                print_debug_info('### DEBUG ### Wrong Hash')
                 return False
 
         except BadSignatureError:
-            print('### DEBUG ### Bad Signature, Validation Failed')
+            print_debug_info('### DEBUG ### Bad Signature, Validation Failed')
             return False
 
     def create_proof(self, miner_key):
@@ -111,7 +112,7 @@ class PoW_Blockchain(Blockchain):
         return test_hash[:difficulty] == '0' * difficulty
 
     def resolve_conflict(self, new_chain):
-        print('### DEBUG ### Resolving conflict')
+        print_debug_info('### DEBUG ### Resolving conflict')
         if len(self.chain) < len(new_chain):
             # Validate new chain:
             # store old chain, and set self.chain to new_chain (needed for check_balance)
@@ -122,15 +123,15 @@ class PoW_Blockchain(Blockchain):
             while current_index < len(new_chain):
                 block = new_chain[current_index]
                 if not self.validate_block(block, last_block):
-                    print('### DEBUG ### Conflict resolved (old chain)')
+                    print_debug_info('### DEBUG ### Conflict resolved (old chain)')
                     self.chain = old_chain
                     return
                 last_block = block
                 current_index += 1
             # self.chain = new_chain
-            print('### DEBUG ### Conflict resolved (new chain)')
+            print_debug_info('### DEBUG ### Conflict resolved (new chain)')
         else:
-            print('### DEBUG ### Conflict resolved (old chain)')
+            print_debug_info('### DEBUG ### Conflict resolved (old chain)')
 
     def scale_difficulty(self, last_block):
         """ Example implementation of a scaling difficulty curve

@@ -23,7 +23,16 @@ def create_random_transaction():
 
 
 def get_command():
-    pass
+    yield 'mine'
+    yield 'mine'
+    yield 'transaction a 10'
+    yield 'transaction b 20'
+    yield 'mine'
+    yield 'balance'  # should be 50+50-(10+1)-(20+1)+(50+1+1)
+
+
+def get_expected():
+    yield 50+50-(10+1)-(20+1)+(50+1+1)
 
 
 def get_random_command():
@@ -36,16 +45,28 @@ def get_random_command():
         return 'exit'
 
 
-async def run_command(type, *args):
+async def run_planned_command(*args):
     proc = await asyncio.create_subprocess_exec(*args,
                                                 stdin=PIPE,
                                                 stdout=PIPE,
                                                 )
 
+    commands = [
+        'mine',
+        'mine',
+        'transaction a 10',
+        'transaction b 20',
+        'mine',
+        'balance',  # should be 50+50-(10+1)-(20+1)+(50+1+1)
+        'exit'
+    ]
+    counter = 0
+
     while True:
 
         if random.randint(1, 100) < 5:
-            com = get_random_command() if type == 'random' else get_command()
+            com = commands[counter]
+            counter += 1
             print(f'### {current_time()} Execute: {com}')
             proc.stdin.write(bytes(com.encode('utf-8')) + b'\n')
 
@@ -57,8 +78,41 @@ async def run_command(type, *args):
             if not line:
                 break
             else:
-                print(line.decode('utf-8'))
-                continue
+                rec = line.decode('utf-8')
+                print(rec)
+                if rec.startswith('Current Balance: '):
+                    if int(rec.split(':')[1]) == 50+50-(10+1)-(20+1)+(50+1+1):
+                        print('----------- Balance as expected !')
+                        return
+                    else:
+                        print('----------- WRONG Balance !!!')
+        time.sleep(0.01)
+    return await proc.wait()
+
+
+async def run_random_command(*args):
+    proc = await asyncio.create_subprocess_exec(*args,
+                                                stdin=PIPE,
+                                                stdout=PIPE,
+                                                )
+
+    while True:
+
+        if random.randint(1, 100) < 5:
+            com = get_random_command()
+            print(f'### {current_time()} Execute: {com}')
+            proc.stdin.write(bytes(com.encode('utf-8')) + b'\n')
+
+        try:
+            line = await asyncio.wait_for(proc.stdout.readline(), 0.01)
+        except asyncio.TimeoutError:
+            pass
+        else:
+            if not line:
+                break
+            else:
+                rec = line.decode('utf-8')
+                print(rec)
         time.sleep(0.01)
     return await proc.wait()
 
@@ -72,11 +126,10 @@ def planned_test(port=7777):
 
     print(f'### {current_time()} Starting on port: {port}:')
     loop.run_until_complete(
-        run_command(
-            '',
+        run_planned_command(
             'python',
             'core.py',
-            f'--port={port}'
+            f'--port={port}',
             '--store=keys_abc'
         ))
 
@@ -91,8 +144,7 @@ def random_stress_test(port=7777):
     while True:
         print(f'### {current_time()} Starting on port: {port}:')
         loop.run_until_complete(
-            run_command(
-                'random',
+            run_random_command(
                 'python',
                 'core.py',
                 f'--port={port}',
@@ -107,9 +159,9 @@ def setup_test_environment():
 
 def main():
     try:
-        random_stress_test(sys.argv[1])
+        planned_test(sys.argv[1])
     except:
-        random_stress_test()
+        planned_test()
 
 
 if __name__ == '__main__':
