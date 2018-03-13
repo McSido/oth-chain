@@ -82,10 +82,10 @@ async def run_planned_command(*args):
                 print(rec)
                 if rec.startswith('Current Balance: '):
                     if int(rec.split(':')[1]) == 50+50-(10+1)-(20+1)+(50+1+1):
-                        print('----------- Balance as expected !')
+                        print('√√√√ Balance as expected √√√√')
                         return
                     else:
-                        print('----------- WRONG Balance !!!')
+                        print('XXXX WRONG Balance XXXX!')
         time.sleep(0.01)
     return await proc.wait()
 

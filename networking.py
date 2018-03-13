@@ -15,6 +15,7 @@ BUFFER_SIZE = 1024
 peer_list = set()  # Known peers
 active_peers = set()  # Active peers
 unresponsive_peers = set()
+self_address = set()
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
@@ -55,11 +56,11 @@ def broadcast(msg_type, msg_data):
     if len(active_peers) == 0:
         # If no active peers, try messaging everyone
         for peer in peer_list:
-            if peer != ('127.0.0.1', PORT):
+            if peer not in self_address:
                 send_msg(msg_type, msg_data, peer)
 
     for peer in active_peers:
-        if peer != ('127.0.0.1', PORT):
+        if peer not in self_address:
             send_msg(msg_type, msg_data, peer)
 
 
@@ -123,7 +124,7 @@ def new_peer(address):
     Arguments:
     address -> Address of the new peer
     """
-    if (address != (('127.0.0.1', PORT)) and
+    if (address not in self_address and
             address not in active_peers.union(unresponsive_peers)):
         broadcast('N_new_peer', address)
         get_peers(address)  # Send known peers to new peer
@@ -134,19 +135,25 @@ def new_peer(address):
 
 def ping_peers():
     for p in peer_list:
-        if p != ('127.0.0.1', PORT):
+        if p not in self_address:
             unresponsive_peers.add(p)
             send_msg('N_ping', '', p)
 
 
 def load_initial_peers():
     """ Load initial peers from peers.cfg file
+        and add current addresses to self_address
     """
     # TODO: check for validity (IP-address PORT)
     with open('./peers.cfg') as f:
         for peer in f:
             p = peer.split(' ')
             peer_list.add((p[0], int(p[1])))
+
+    self_address.add(('127.0.0.1', PORT))
+    hostname = socket.gethostname()
+    IP = socket.gethostbyname(hostname)
+    self_address.add((IP, PORT))
 
 
 def example_worker(send_queue, receive_queue, command_queue):
