@@ -219,18 +219,18 @@ def main(argv=sys.argv):
         command = re.sub(r'\s\s*', ' ', command)
         if command == 'help':
             print(""" Available commands:
-                transaction <from> <to> <amount>
-                mine
-                dump
-                peers
-                key <filename>
-                gui
-                import <key> <name>
-                deletekey <name>
-                export <filename>
-                balance [<name>]
-                save
-                exit
+                help: prints commands
+                transaction <to> <amount> : Create transaction
+                mine: mine a new block
+                balance [<name>]: Print balance (name optional)
+                dump: print blockchain
+                peers: print peers
+                key <filename> : Save current key to <filename>
+                import <key> <name> : Imports a public key associated with <name> from file <file> to the keystore
+                deletekey <name> : Deletes key associated with <name> from keystore
+                export <filename> : Exports one own public key to file <filename>
+                save: Save blockchain to bc_file.txt
+                exit: exits programm
                 """)
         elif command == 'exit':
             receive_queue.put(('exit', '', 'local'))
@@ -289,7 +289,8 @@ def main(argv=sys.argv):
                 if resolve_name(t[1]):
                     update_keystore(t[1], '')
                 else:
-                    print(f'Could not delete {t[1]} from keystore. Was it spelt right?')
+                    print(
+                        f'Could not delete {t[1]} from keystore. Was it spelt right?')
             except Exception as e:
                 print('Could not delete key')
                 print(e)
@@ -316,12 +317,13 @@ def main(argv=sys.argv):
         elif command == 'save':
             pprint('saving to file named bc_file.txt')
             with open('bc_file.txt', 'wb') as output:
-                pickle.dump(my_blockchain.chain, output, pickle.HIGHEST_PROTOCOL)
+                pickle.dump(my_blockchain.chain, output,
+                            pickle.HIGHEST_PROTOCOL)  # Threadsafe?
         elif command == 'gui':
             print("open gui")
             #app = QApplication(sys.argv)
             #ex = ChainGUI()
-            #sys.exit(app.exec_())
+            # sys.exit(app.exec_())
         else:
             print('Command not found!')
 
