@@ -39,10 +39,12 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     blockchain -> Blockchain that provides the functionality
     """
     if msg_type == 'new_block':
+        assert isinstance(msg_data, Block)
         blockchain.new_block(msg_data)
 
     elif msg_type == 'new_transaction':
         # ignore mining transactions (those are stored immediately in the mined block)
+        assert isinstance(msg_data, Transaction)
         if not msg_data.sender == '0':
             blockchain.new_transaction(msg_data)
 
@@ -65,9 +67,10 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
         send_queue.put(('resolve_conflict', blockchain.chain, msg_address))
 
     elif msg_type == 'resolve_conflict':
+        assert isinstance(msg_data, list)
         blockchain.resolve_conflict(msg_data)
 
-    elif msg_type == 'print_balance':
+    elif msg_type == 'print_balance' and msg_address == 'local':
         print(f'Current Balance: {blockchain.check_balance(msg_data[0], msg_data[1])}')
 
     elif msg_type == 'exit' and msg_address == 'local':
@@ -78,7 +81,11 @@ def blockchain_loop(blockchain):
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
         print_debug_info('### DEBUG ### Processing: ' + msg_type)
-        receive_msg(msg_type, msg_data, msg_address, blockchain)
+        try:
+            receive_msg(msg_type, msg_data, msg_address, blockchain)
+        except AssertionError as e:
+            print_debug_info(f'### DEBUG ### Assertion Error on message {msg_type}:{msg_data}:{msg_address}')
+            print_debug_info(e)
 
 
 def load_key(filename):
@@ -203,7 +210,11 @@ def main(argv=sys.argv):
     # User Interaction
     while True:
         print('Action: ')
-        command = input()
+        try:
+            command = input()
+        except KeyboardInterrupt:
+            print('Detected Keyboard interrupt, exiting program')
+            command = 'exit'
         command = command.lower().strip()
         command = re.sub(r'\s\s*', ' ', command)
         if command == 'help':
