@@ -26,6 +26,10 @@ from utils import print_debug_info, set_debug
 send_queue = Queue()
 receive_queue = Queue()
 networker_command_queue = Queue()
+#queue for exchanging values between gui
+gui_send_queue = Queue()
+gui_receive_queue = Queue()
+
 keystore = dict()
 keystore_filename = 'keystore'
 
@@ -76,7 +80,6 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
 
-
 def blockchain_loop(blockchain):
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
@@ -86,7 +89,6 @@ def blockchain_loop(blockchain):
         except AssertionError as e:
             print_debug_info(f'### DEBUG ### Assertion Error on message {msg_type}:{msg_data}:{msg_address}')
             print_debug_info(e)
-
 
 def load_key(filename):
     """Attempts to load the private key from the provided file
@@ -196,6 +198,11 @@ def main(argv=sys.argv):
         args=(my_blockchain,))
     blockchain_thread.start()
 
+    # gui thread
+    gui_thread = threading.Thread(
+        target=gui_loop,
+        args=(gui_send_queue, gui_receive_queue),)#daemon=True
+
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
 
@@ -209,14 +216,27 @@ def main(argv=sys.argv):
 
     # User Interaction
     while True:
-        print('Action: ')
+
+
+        if(gui_thread.is_alive()): #
+            if(not gui_receive_queue.empty()):
+                command = gui_receive_queue.get(block=True)
+                print('Command from GUI: {}'.format(command))
+            else:
+                continue
+        else:
+            print('Action: ')
+            
         try:
             command = input()
         except KeyboardInterrupt:
             print('Detected Keyboard interrupt, exiting program')
             command = 'exit'
+
         command = command.lower().strip()
         command = re.sub(r'\s\s*', ' ', command)
+
+        gui_send_queue.put(command)
         if command == 'help':
             print(""" Available commands:
                 help: prints commands
@@ -261,6 +281,7 @@ def main(argv=sys.argv):
                                'local'
                                ))
         elif command == 'dump':
+            gui_send_queue.put(vars(my_blockchain))
             pprint(vars(my_blockchain))
         elif command == 'peers':
             networker_command_queue.put('print_peers')
@@ -321,9 +342,8 @@ def main(argv=sys.argv):
                             pickle.HIGHEST_PROTOCOL)  # Threadsafe?
         elif command == 'gui':
             print("open gui")
-            #app = QApplication(sys.argv)
-            #ex = ChainGUI()
-            # sys.exit(app.exec_())
+            gui_thread.start()
+
         else:
             print('Command not found!')
 
