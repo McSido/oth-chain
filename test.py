@@ -3,7 +3,53 @@ import io
 import random
 import sys
 import time
+import getopt
 from asyncio.subprocess import PIPE, STDOUT
+
+
+class TestCase(object):
+
+    command_counter = -1
+
+    planned_commands = [
+        'mine',
+        'mine',
+        'transaction a 10',
+        'transaction b 20',
+        'mine',
+        'balance',  # should be 50+50-(10+1)-(20+1)+(50+1+1)
+        'exit'
+    ]
+
+    def get_command(self):
+        self.command_counter += 1
+        return self.planned_commands[self.command_counter]
+
+    expectation_test = 'Current Balance:'
+    expected_output = f'Current Balance: {50+50-(10+1)-(20+1)+(50+1+1)}'
+    expectation_true = '''    =============================
+    =========Test passed=========
+    √√√√ Balance as expected √√√√
+    =============================
+    =============================
+    '''
+    expectation_false = '''    =============================
+    =========Test failed=========
+    XXXX WRONG Balance XXXX!
+    =============================
+    =============================
+    '''
+
+    def test_expectation(self, result):
+        if not result.startswith(self.expectation_test):
+            return ''
+        elif result.strip() == self.expected_output:
+            return self.expectation_true
+        else:
+            return self.expectation_false
+
+
+current_test = TestCase()
 
 
 def current_time():
@@ -22,19 +68,6 @@ def create_random_transaction():
         str(random.randint(1, 100))
 
 
-def get_command():
-    yield 'mine'
-    yield 'mine'
-    yield 'transaction a 10'
-    yield 'transaction b 20'
-    yield 'mine'
-    yield 'balance'  # should be 50+50-(10+1)-(20+1)+(50+1+1)
-
-
-def get_expected():
-    yield 50+50-(10+1)-(20+1)+(50+1+1)
-
-
 def get_random_command():
     command = random.randint(1, 50)
     if command < 15:
@@ -51,22 +84,10 @@ async def run_planned_command(*args):
                                                 stdout=PIPE,
                                                 )
 
-    commands = [
-        'mine',
-        'mine',
-        'transaction a 10',
-        'transaction b 20',
-        'mine',
-        'balance',  # should be 50+50-(10+1)-(20+1)+(50+1+1)
-        'exit'
-    ]
-    counter = 0
-
     while True:
 
-        if random.randint(1, 100) < 5:
-            com = commands[counter]
-            counter += 1
+        if random.randint(1, 100) < 5:  # Add random element
+            com = current_test.get_command()
             print(f'### {current_time()} Execute: {com}')
             proc.stdin.write(bytes(com.encode('utf-8')) + b'\n')
 
@@ -80,12 +101,7 @@ async def run_planned_command(*args):
             else:
                 rec = line.decode('utf-8')
                 print(rec)
-                if rec.startswith('Current Balance: '):
-                    if int(rec.split(':')[1]) == 50+50-(10+1)-(20+1)+(50+1+1):
-                        print('√√√√ Balance as expected √√√√')
-                        return
-                    else:
-                        print('XXXX WRONG Balance XXXX!')
+                print(current_test.test_expectation(rec))
         time.sleep(0.01)
     return await proc.wait()
 
@@ -117,7 +133,13 @@ async def run_random_command(*args):
     return await proc.wait()
 
 
-def planned_test(port=7777):
+def planned_test(port=7777, test_type='balance'):
+
+    if test_type == 'balance':
+        pass
+    elif test_type == '':
+        pass
+
     if sys.platform == "win32":
         loop = asyncio.ProactorEventLoop()  # for subprocess' pipes on Windows
         asyncio.set_event_loop(loop)
@@ -157,11 +179,20 @@ def setup_test_environment():
     pass
 
 
-def main():
+def main(argv=sys.argv):
+    port = 7777
     try:
-        planned_test(sys.argv[1])
-    except:
-        planned_test()
+        opts, args = getopt.getopt(argv[1:], 'p=', ['port='])
+        for o, a in opts:
+            if o in ('-p', '--port'):
+                try:
+                    port = int(a)
+                except:
+                    print("Port was invalid (e.g. not an int)")
+    except getopt.GetoptError as err:
+        print(err)
+
+    planned_test(port)
 
 
 if __name__ == '__main__':
