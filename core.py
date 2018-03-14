@@ -26,6 +26,10 @@ from utils import print_debug_info, set_debug
 send_queue = Queue()
 receive_queue = Queue()
 networker_command_queue = Queue()
+#queue for exchanging values between gui
+gui_send_queue = Queue()
+gui_receive_queue = Queue()
+
 keystore = dict()
 keystore_filename = 'keystore'
 
@@ -73,13 +77,11 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
 
-
 def blockchain_loop(blockchain):
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
         print_debug_info('### DEBUG ### Processing: ' + msg_type)
         receive_msg(msg_type, msg_data, msg_address, blockchain)
-
 
 def load_key(filename):
     """Attempts to load the private key from the provided file
@@ -189,6 +191,11 @@ def main(argv=sys.argv):
         args=(my_blockchain,))
     blockchain_thread.start()
 
+    # gui thread
+    gui_thread = threading.Thread(
+        target=gui_loop,
+        args=(gui_send_queue, gui_receive_queue),)#daemon=True
+
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
 
@@ -203,9 +210,16 @@ def main(argv=sys.argv):
     # User Interaction
     while True:
         print('Action: ')
-        command = input()
-        command = command.lower().strip()
-        command = re.sub(r'\s\s*', ' ', command)
+
+        if(not gui_receive_queue.empty()):  # gui_thread.is_alive() and
+            command = gui_receive_queue.get(block=False)
+            #print(command)
+        else:
+            command = input()
+            command = command.lower().strip()
+            command = re.sub(r'\s\s*', ' ', command)
+
+        gui_send_queue.put(command)
         if command == 'help':
             print(""" Available commands:
                 transaction <from> <to> <amount>
@@ -225,6 +239,7 @@ def main(argv=sys.argv):
             receive_queue.put(('exit', '', 'local'))
             send_queue.put(None)
             save_keystore()
+            gui_thread.join()
             blockchain_thread.join()
             networker.join()
             sys.exit()
@@ -250,6 +265,7 @@ def main(argv=sys.argv):
                                'local'
                                ))
         elif command == 'dump':
+            gui_send_queue.put(vars(my_blockchain))
             pprint(vars(my_blockchain))
         elif command == 'peers':
             networker_command_queue.put('print_peers')
@@ -308,9 +324,7 @@ def main(argv=sys.argv):
                 pickle.dump(my_blockchain.chain, output, pickle.HIGHEST_PROTOCOL)
         elif command == 'gui':
             print("open gui")
-            #app = QApplication(sys.argv)
-            #ex = ChainGUI()
-            #sys.exit(app.exec_())
+            gui_thread.start()
         else:
             print('Command not found!')
 
