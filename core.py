@@ -43,10 +43,12 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     blockchain -> Blockchain that provides the functionality
     """
     if msg_type == 'new_block':
+        assert isinstance(msg_data, Block)
         blockchain.new_block(msg_data)
 
     elif msg_type == 'new_transaction':
         # ignore mining transactions (those are stored immediately in the mined block)
+        assert isinstance(msg_data, Transaction)
         if not msg_data.sender == '0':
             blockchain.new_transaction(msg_data)
 
@@ -69,9 +71,10 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
         send_queue.put(('resolve_conflict', blockchain.chain, msg_address))
 
     elif msg_type == 'resolve_conflict':
+        assert isinstance(msg_data, list)
         blockchain.resolve_conflict(msg_data)
 
-    elif msg_type == 'print_balance':
+    elif msg_type == 'print_balance' and msg_address == 'local':
         print(f'Current Balance: {blockchain.check_balance(msg_data[0], msg_data[1])}')
 
     elif msg_type == 'exit' and msg_address == 'local':
@@ -81,7 +84,11 @@ def blockchain_loop(blockchain):
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
         print_debug_info('### DEBUG ### Processing: ' + msg_type)
-        receive_msg(msg_type, msg_data, msg_address, blockchain)
+        try:
+            receive_msg(msg_type, msg_data, msg_address, blockchain)
+        except AssertionError as e:
+            print_debug_info(f'### DEBUG ### Assertion Error on message {msg_type}:{msg_data}:{msg_address}')
+            print_debug_info(e)
 
 def load_key(filename):
     """Attempts to load the private key from the provided file
@@ -210,6 +217,7 @@ def main(argv=sys.argv):
     # User Interaction
     while True:
 
+
         if(gui_thread.is_alive()): #
             if(not gui_receive_queue.empty()):
                 command = gui_receive_queue.get(block=True)
@@ -218,25 +226,31 @@ def main(argv=sys.argv):
                 continue
         else:
             print('Action: ')
+            
+        try:
             command = input()
+        except KeyboardInterrupt:
+            print('Detected Keyboard interrupt, exiting program')
+            command = 'exit'
+
         command = command.lower().strip()
         command = re.sub(r'\s\s*', ' ', command)
 
         gui_send_queue.put(command)
         if command == 'help':
             print(""" Available commands:
-                transaction <from> <to> <amount>
-                mine
-                dump
-                peers
-                key <filename>
-                gui
-                import <key> <name>
-                deletekey <name>
-                export <filename>
-                balance [<name>]
-                save
-                exit
+                help: prints commands
+                transaction <to> <amount> : Create transaction
+                mine: mine a new block
+                balance [<name>]: Print balance (name optional)
+                dump: print blockchain
+                peers: print peers
+                key <filename> : Save current key to <filename>
+                import <key> <name> : Imports a public key associated with <name> from file <file> to the keystore
+                deletekey <name> : Deletes key associated with <name> from keystore
+                export <filename> : Exports one own public key to file <filename>
+                save: Save blockchain to bc_file.txt
+                exit: exits programm
                 """)
         elif command == 'exit':
             receive_queue.put(('exit', '', 'local'))
@@ -296,7 +310,8 @@ def main(argv=sys.argv):
                 if resolve_name(t[1]):
                     update_keystore(t[1], '')
                 else:
-                    print(f'Could not delete {t[1]} from keystore. Was it spelt right?')
+                    print(
+                        f'Could not delete {t[1]} from keystore. Was it spelt right?')
             except Exception as e:
                 print('Could not delete key')
                 print(e)
@@ -323,10 +338,12 @@ def main(argv=sys.argv):
         elif command == 'save':
             pprint('saving to file named bc_file.txt')
             with open('bc_file.txt', 'wb') as output:
-                pickle.dump(my_blockchain.chain, output, pickle.HIGHEST_PROTOCOL)
+                pickle.dump(my_blockchain.chain, output,
+                            pickle.HIGHEST_PROTOCOL)  # Threadsafe?
         elif command == 'gui':
             print("open gui")
             gui_thread.start()
+
         else:
             print('Command not found!')
 
