@@ -239,7 +239,6 @@ def main(argv=sys.argv):
             receive_queue.put(('exit', '', 'local'))
             send_queue.put(None)
             save_keystore()
-            gui_thread.join()
             blockchain_thread.join()
             networker.join()
             sys.exit()
