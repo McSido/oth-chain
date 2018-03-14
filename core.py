@@ -209,15 +209,18 @@ def main(argv=sys.argv):
 
     # User Interaction
     while True:
-        print('Action: ')
 
-        if(not gui_receive_queue.empty()):  # gui_thread.is_alive() and
-            command = gui_receive_queue.get(block=False)
-            #print(command)
+        if(gui_thread.is_alive()): #
+            if(not gui_receive_queue.empty()):
+                command = gui_receive_queue.get(block=True)
+                print('Command from GUI: {}'.format(command))
+            else:
+                continue
         else:
+            print('Action: ')
             command = input()
-            command = command.lower().strip()
-            command = re.sub(r'\s\s*', ' ', command)
+        command = command.lower().strip()
+        command = re.sub(r'\s\s*', ' ', command)
 
         gui_send_queue.put(command)
         if command == 'help':

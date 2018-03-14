@@ -19,7 +19,7 @@ def gui_loop(gui_send_queue, gui_receive_queue):
 def read_from_queue(send_queue, textBrowser):
     while True:
         if not send_queue.empty():
-            cmd = send_queue.get(block=True)
+            cmd = send_queue.get(block=False)
             textBrowser.append(str(cmd) + '\n')
             if(cmd == None or cmd == 'exit'):
                 return
@@ -77,7 +77,7 @@ class ChainGUI(QWidget):
         receive_queue.put("transaction")
         #print("transaction",)
     def slot_mine(self, receive_queue):
-        receive_queue.put('mine')
+        receive_queue.put("mine")
         #print("mine")
     def slot_dump(self, receive_queue):
         receive_queue.put('dump')
@@ -93,5 +93,6 @@ class ChainGUI(QWidget):
         #print("save")
     def slot_exit(self, receive_queue):
         receive_queue.put('exit')
+        self.close()
         #sys.exit(status=None)
 
