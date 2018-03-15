@@ -39,15 +39,16 @@ class PoW_Blockchain(Blockchain):
             return False
         # check if the proof of the new block is valid
         mining_transaction = None
-        for transaction in block.transactions:
-            if transaction.sender == '0' and transaction.signature == '0':
-                mining_transaction = transaction
-                break
-        if not self.validate_proof(last_block, block.proof, mining_transaction.recipient):
-            return False
+        mining_transaction_found = False
         # validate all transactions
         for transaction in block.transactions:
             if transaction.sender == '0' and transaction.signature == '0':
+                if mining_transaction_found:
+                    return False
+                mining_transaction = transaction
+                mining_transaction_found = True
+                if not self.validate_proof(last_block, block.proof, mining_transaction.recipient):
+                    return False
                 fee_sum = 0
                 for block_transaction in block.transactions:
                     fee_sum += block_transaction.fee
