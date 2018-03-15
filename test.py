@@ -8,6 +8,11 @@ from asyncio.subprocess import PIPE, STDOUT
 
 
 class TestCase(object):
+    """ Class to be used in the tests
+    Change planned_commands, expectation_test,
+    expected_output, expectation_true, expectation_false
+    depening on current test
+    """
 
     command_counter = -1
 
@@ -49,15 +54,21 @@ class TestCase(object):
             return self.expectation_false
 
 
-current_test = TestCase()
+current_test = TestCase()  # testcase used in planned_test
 
 
 def current_time():
+    """Returns current time
+    """
     t = time.localtime()[3:6]
     return f'({t[0]}:{t[1]}:{t[2]})'
 
 
 def create_random_transaction():
+    """ Returns a random transaction
+    accounts = [a,b,c]
+    amount = [1-100]
+    """
     accounts = [
         'a',
         'b',
@@ -69,6 +80,12 @@ def create_random_transaction():
 
 
 def get_random_command():
+    """Returns a random command
+    Possible commands:
+    - mine
+    - transaction (random)
+    - exit
+    """
     command = random.randint(1, 50)
     if command < 15:
         return 'mine'
@@ -79,6 +96,9 @@ def get_random_command():
 
 
 async def run_planned_command(*args):
+    """Async function to run the planned stresstest,
+    using the global current_test
+    """
     proc = await asyncio.create_subprocess_exec(*args,
                                                 stdin=PIPE,
                                                 stdout=PIPE,
@@ -107,6 +127,8 @@ async def run_planned_command(*args):
 
 
 async def run_random_command(*args):
+    """Async function to run the random stresstest
+    """
     proc = await asyncio.create_subprocess_exec(*args,
                                                 stdin=PIPE,
                                                 stdout=PIPE,
@@ -134,6 +156,8 @@ async def run_random_command(*args):
 
 
 def planned_test(port=7777, test_type='balance'):
+    """ Run a planned test on the blockchain using the current_test object
+    """
 
     if test_type == 'balance':
         pass
@@ -157,6 +181,9 @@ def planned_test(port=7777, test_type='balance'):
 
 
 def random_stress_test(port=7777):
+    """ Run a stress test that uses get_random_command()
+    to execute random commands on the blockchain
+    """
     if sys.platform == "win32":
         loop = asyncio.ProactorEventLoop()  # for subprocess' pipes on Windows
         asyncio.set_event_loop(loop)
