@@ -7,7 +7,7 @@
 Contains an abstract class of a blockchain \
 Current implementations:
 
-* [pow_chain.py](./pow_chain.py)\
+* [pow_chain.py](./pow_chain.py)
 
 A Proof-of-Work blockchain that uses sha256 as the hashing-algorithm \
 Basic functionality implemented
@@ -15,7 +15,7 @@ Basic functionality implemented
 ## [networking.py](./networking.py)
 
 Responsible for all parts of the networking/P2P aspect of the blockchain \
-Uses UDP packages\
+Uses UDP packages
 
 ## [core.py](./core.py)
 
@@ -65,6 +65,7 @@ exit: exits programm
 ## Internal communication
 
 Internal communication (between threads) of the blockchain is handled via two Queues \
+<img src="./documentation/Blockchain_internal.svg">
 Communication happens between Blockchain<->Networking and CLI<->Blockchain
 
 ### send_queue

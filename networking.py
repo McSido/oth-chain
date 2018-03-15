@@ -87,7 +87,12 @@ def process_incoming_msg(msg, in_address, receive_queue):
     in_address -> Address of the sender
     receive_queue -> Queue for communication with the blockchain
     """
-    msg_type, msg_data = unpack_msg(msg)
+    try:
+        msg_type, msg_data = unpack_msg(msg)
+    except ValueError as err:
+        print_debug_info(f'### DEBUG ### Received invalid message\n {err}')
+        return
+
     print_debug_info('### DEBUG ### received: ' + msg_type)
     if msg_type.startswith('N_'):
         # networking messages
@@ -134,6 +139,8 @@ def new_peer(address):
 
 
 def ping_peers():
+    """ Ping all peers in peer_list
+    """
     for p in peer_list:
         if p not in self_address:
             unresponsive_peers.add(p)
@@ -148,6 +155,7 @@ def load_initial_peers():
     with open('./peers.cfg') as f:
         for peer in f:
             p = peer.split(' ')
+            assert len(p) == 2
             peer_list.add((p[0], int(p[1])))
 
     self_address.add(('127.0.0.1', PORT))
