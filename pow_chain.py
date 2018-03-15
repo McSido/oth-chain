@@ -47,7 +47,16 @@ class PoW_Blockchain(Blockchain):
             return False
         # validate all transactions
         for transaction in block.transactions:
-            if not self.validate_transaction(transaction, mining=True):
+            if transaction.sender == '0' and transaction.signature == '0':
+                fee_sum = 0
+                for block_transaction in block.transactions:
+                    fee_sum += block_transaction.fee
+                mining_reward = math.floor(50 / max(math.floor(math.log(block.index) / 2), 1))
+                if mining_reward == 1:
+                    mining_reward = 0
+                if not mining_reward + fee_sum == transaction.amount:
+                    return False
+            elif not self.validate_transaction(transaction, mining=True):
                 return False
         return True
 
@@ -57,8 +66,8 @@ class PoW_Blockchain(Blockchain):
             return False
         if transaction in self.transaction_pool and not mining:
             return False
-        if transaction.sender == '0' and transaction.signature == '0':
-            return True
+        # if transaction.sender == '0' and transaction.signature == '0':
+        #    return True
         try:
             verify_key = nacl.signing.VerifyKey(transaction.sender, encoder=nacl.encoding.HexEncoder)
             transaction_hash = verify_key.verify(transaction.signature).decode()
