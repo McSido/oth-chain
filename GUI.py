@@ -84,7 +84,7 @@ class ChainGUI(QWidget):
         line2.move(100,100)
         okButton.move(50, 150)
         cancelButton.move(150, 150)
-        #d.buttonClicked.connect(partial(receive_queue, line1.text(), line2.text()))
+        d.buttonClicked.connect(partial(receive_queue, line1.text(), line2.text()))
 
 
         d.exec()
