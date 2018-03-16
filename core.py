@@ -231,11 +231,11 @@ def main(argv=sys.argv):
         else:
             print('Action: ')
             
-        try:
-            command = input()
-        except KeyboardInterrupt:
-            print('Detected Keyboard interrupt, exiting program')
-            command = 'exit'
+            try:
+                command = input()
+            except KeyboardInterrupt:
+                print('Detected Keyboard interrupt, exiting program')
+                command = 'exit'
 
         command = command.lower().strip()
         command = re.sub(r'\s\s*', ' ', command)
