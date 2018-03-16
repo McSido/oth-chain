@@ -66,33 +66,50 @@ class ChainGUI(QWidget):
         grid.addWidget(exitButton, 10, 6)
 
         self.setLayout(grid)
-#
         self.setGeometry(350, 350, 650, 600)
-        self.setWindowTitle('Test Layout')
+        self.setWindowTitle('OTH-Chain')
         self.show()
 
     # Slots
     def slot_transaction(self, receive_queue):
-        # TODO open dialog for writing transaction details
-        receive_queue.put("transaction")
-        #print("transaction",)
+        d = QDialog()
+        d.setWindowTitle("Transaction Details")
+        line1 = QLineEdit(d)
+        line1.setPlaceholderText("to")
+        line2 = QLineEdit(d)
+        line2.setPlaceholderText("Amount")
+        cancelButton = QPushButton("&Cancel", d)
+        okButton = QPushButton("&Ok", d)
+        line1.move(100, 50)
+        line2.move(100,100)
+        okButton.move(50, 150)
+        cancelButton.move(150, 150)
+        #d.buttonClicked.connect(partial(receive_queue, line1.text(), line2.text()))
+
+
+        d.exec()
+
     def slot_mine(self, receive_queue):
         receive_queue.put("mine")
-        #print("mine")
+
     def slot_dump(self, receive_queue):
         receive_queue.put('dump')
-        #print("dump")
+
     def slot_peers(self, receive_queue):
         receive_queue.put("peers")
-        #print("peers")
+
     def slot_key(self, receive_queue):
         receive_queue.put("key")
-        #print("key")
+
     def slot_save(self, receive_queue):
         receive_queue.put("save")
-        #print("save")
+
     def slot_exit(self, receive_queue):
         receive_queue.put('exit')
         self.close()
         #sys.exit(status=None)
+
+    def slot_sendTransactionData(self, receive_queue, to, amount):
+        print("transaction " + to + ' ' + amount)
+        #receive_queue.put("transaction " + to + ' ' + amount)
 
