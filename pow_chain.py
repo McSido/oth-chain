@@ -52,9 +52,8 @@ class PoW_Blockchain(Blockchain):
                 fee_sum = 0
                 for block_transaction in block.transactions:
                     fee_sum += block_transaction.fee
-                mining_reward = math.floor(50 / max(math.floor(math.log(block.index) / 2), 1))
-                if mining_reward == 1:
-                    mining_reward = 0
+                reward_multiplicator = math.floor(block.index / 10) - 1
+                mining_reward = 50 >> 2 ** reward_multiplicator if reward_multiplicator >= 0 else 50
                 if not mining_reward + fee_sum == transaction.amount:
                     return False
             elif not self.validate_transaction(transaction, mining=True):
@@ -63,7 +62,8 @@ class PoW_Blockchain(Blockchain):
 
     def validate_transaction(self, transaction, mining=False):
         if not transaction.amount > 0:
-            print_debug_info(f'### DEBUG ### Received transaction with amount {transaction.amount} lower or equal to zero')
+            print_debug_info(
+                f'### DEBUG ### Received transaction with amount {transaction.amount} lower or equal to zero')
             return False
         if transaction in self.transaction_pool and not mining:
             return False
