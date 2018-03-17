@@ -59,9 +59,8 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
         fee_sum = 0
         for transaction in block.transactions:
             fee_sum += transaction.fee
-        mining_reward = math.floor(50/max(math.floor(math.log(block.index) / 2), 1))
-        if mining_reward == 1:
-            mining_reward = 0
+        reward_multiplicator = math.floor(block.index / 10) - 1
+        mining_reward = 50 >> 2**reward_multiplicator if reward_multiplicator >= 0 else 50
         block.transactions.append(
             Transaction(sender='0', recipient=msg_data,
                         amount=mining_reward+fee_sum, fee=0, timestamp=time.time(), signature='0'))
