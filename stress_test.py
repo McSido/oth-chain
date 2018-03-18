@@ -48,7 +48,10 @@ class TestCase(object):
     def test_expectation(self, result):
         if not result.startswith(self.expectation_test):
             return ''
-        elif result.strip() == self.expected_output:
+
+        assert result.strip() == self.expected_output
+
+        if result.strip() == self.expected_output:
             return self.expectation_true
         else:
             return self.expectation_false
