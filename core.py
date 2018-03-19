@@ -241,7 +241,7 @@ def main(argv=sys.argv):
 
         gui_send_queue.put(command)
         if command == 'help':
-            print(""" Available commands:
+            help_str = (""" Available commands:
                 help: prints commands
                 transaction <to> <amount> : Create transaction
                 mine: mine a new block
@@ -255,6 +255,8 @@ def main(argv=sys.argv):
                 save: Save blockchain to bc_file.txt
                 exit: exits programm
                 """)
+            print(help_str)
+            gui_send_queue.put(help_str)
         elif command == 'exit':
             receive_queue.put(('exit', '', 'local'))
             send_queue.put(None)
