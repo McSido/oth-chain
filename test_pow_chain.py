@@ -1,3 +1,7 @@
+""" Testing module for the Proof-Of-Work implementation
+    of the blockchain client.
+"""
+
 from queue import Queue
 import nacl.signing
 import nacl.encoding
@@ -9,7 +13,13 @@ import pow_chain
 
 
 class Test_POW():
+    """ Testcase used to bundle all tests for the
+        Proof-Of-Work blockchain
+    """
+
     def setup(self):
+        """ Setup of the blockchain for the tests
+        """
         self.sends = Queue()
         self.blockchain = pow_chain.PoW_Blockchain(self.sends, 0)
         self.sender_sign = nacl.signing.SigningKey(seed=b'a'*32)
@@ -20,6 +30,8 @@ class Test_POW():
             nacl.encoding.HexEncoder)
 
     def test_block(self):
+        """ Test that the block creation works as intended
+        """
         proof = self.blockchain.create_proof(self.sender_verify)
         block = self.blockchain.create_block(proof)
         mining_transaction = \
@@ -41,6 +53,9 @@ class Test_POW():
             self.sender_verify, time.time()) == 50
 
     def test_transaction_invalid_balance(self):
+        """ Test that the transactions with invalid balances are recognized and
+            not added to the blockchain
+        """
         amount = 10
         timestamp = time.time()
 
@@ -67,7 +82,9 @@ class Test_POW():
         assert self.sends.empty()
 
     def test_transaction_invalid_signature(self):
-
+        """ Test that the transactions with invalid signatures are recognized
+            and not added to the blockchain
+        """
         self.mine_block()
 
         amount = 10
@@ -96,7 +113,8 @@ class Test_POW():
         assert self.sends.empty()
 
     def test_transaction_invalid_double(self):
-
+        """ Test that the same transaction is not added twice to the blockchain
+        """
         self.mine_block()
 
         amount = 10
@@ -127,7 +145,9 @@ class Test_POW():
         assert not self.blockchain.validate_transaction(transaction)
 
     def test_transaction_valid(self):
-
+        """ Test that a valid transaction is recognized and added to the
+            blockchain
+        """
         self.mine_block()
 
         amount = 10
@@ -156,7 +176,8 @@ class Test_POW():
         assert not self.sends.empty()
 
     def mine_block(self):
-        # Mine block for initial coins
+        """ Mine an initial block to add a balance to the test account
+        """
 
         proof = self.blockchain.create_proof(self.sender_verify)
         block = self.blockchain.create_block(proof)

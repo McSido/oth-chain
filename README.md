@@ -1,20 +1,19 @@
 # Blockchain for the project-study
 
-# Instructions
+## Instructions
 
-## Prerequisites
+### Prerequisites
 
 * NaCl (Cryptography)\
  `pip install pynacl`
 
-## Setup
+### Setup
 
 1. Clone repo
-2. Make copy of repo
-3. Change port in [peers.cfg](./peers.cfg) of the copy
-4. Start both [core.py](./core.py) with --port=\<PORT> (Standard port=6666)
+2. Edit [peers.cfg](./peers.cfg) if needed
+3. Start multiple [core.py](./core.py) with --port=\<PORT> (Standard port=6666)
 
-## Commands
+### Commands
 
 **help**: prints commands\
 **transaction \<to> \<amount>** : Create transaction \
@@ -30,7 +29,7 @@
 **save**: Save blockchain to bc_file.txt\
 **exit**: exits programm
 
-## Options
+### Options
 
 ```
 -p --port=<PORT>   Change port (default is 6666)
@@ -39,11 +38,11 @@
 -d --debug         Activate debug prints
 ```
 
-# Information
+## Information
 
-## Components
+### Components
 
-### [blockchain.py](./blockchain.py)
+#### [blockchain.py](./blockchain.py)
 
 Contains an abstract class of a blockchain \
 Current implementations:
@@ -53,28 +52,28 @@ Current implementations:
 A Proof-of-Work blockchain that uses sha256 as the hashing-algorithm \
 Basic functionality implemented
 
-### [networking.py](./networking.py)
+#### [networking.py](./networking.py)
 
 Responsible for all parts of the networking/P2P aspect of the blockchain \
 Uses UDP packages
 
-### [core.py](./core.py)
+#### [core.py](./core.py)
 
 Start of the blockchain \
 Responsible for the setup of the blockchain and networking system \
 CLI loop
 
-## Internal communication
+### Internal communication
 
 Internal communication (between threads) of the blockchain is handled via two Queues \
 <img src="./documentation/Blockchain_internal.svg">
 
-## Networking protocol
+### Networking protocol
 
 Messages are serialized via pythons _pickle_ module \
 Messages contain a message-type and message-data
 
-## Tests
+### Tests
 
 For testing run py.test -v\
 Additional stress-tests are in  [stress_test.py](./stress_test.py)

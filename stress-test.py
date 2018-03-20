@@ -1,3 +1,10 @@
+""" Stresstest module for the blockchain client,
+    contains some tests to see how well the
+    blockchain works under normal usage
+
+    Not very extensive, should be redone to work
+    with py.test
+"""
 import asyncio
 import io
 import random
@@ -27,6 +34,8 @@ class TestCase(object):
     ]
 
     def get_command(self):
+        """ Returns one of the planned commands in order
+        """
         self.command_counter += 1
         return self.planned_commands[self.command_counter]
 
@@ -46,6 +55,12 @@ class TestCase(object):
     '''
 
     def test_expectation(self, result):
+        """ Test the input against the expectation
+            Arguments:
+                result -> Result to be compared against expectations
+            Returns:
+                string containing expectation result
+        """
         if not result.startswith(self.expectation_test):
             return ''
 
@@ -206,10 +221,15 @@ def random_stress_test(port=7777):
 
 
 def setup_test_environment():
+    """ Setup the test environment for py.test
+        Currently unimplemented
+    """
     pass
 
 
 def main(argv=sys.argv):
+    """ Main function of the stresstest
+    """
     port = 7777
     try:
         opts, args = getopt.getopt(argv[1:], 'p=', ['port='])
