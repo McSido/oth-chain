@@ -1,3 +1,9 @@
+""" Core module of the blockchain client
+    contains the main function of the program,
+    as well as a target function for the blockchain thread
+    Also contains various functions for private/public keys
+"""
+
 import re
 import sys
 import threading
@@ -26,7 +32,7 @@ from utils import print_debug_info, set_debug
 send_queue = Queue()
 receive_queue = Queue()
 networker_command_queue = Queue()
-#queue for exchanging values between gui
+# queue for exchanging values between gui
 gui_send_queue = Queue()
 gui_receive_queue = Queue()
 
@@ -83,7 +89,12 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain):
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
 
+
 def blockchain_loop(blockchain):
+    """ The main loop of the blockchain thread, receives messages and processes them
+        Arguments:
+            blockchain -> the blockchain upon which to operate
+    """
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
         print_debug_info('### DEBUG ### Processing: ' + msg_type)
@@ -93,32 +104,49 @@ def blockchain_loop(blockchain):
             print_debug_info(f'### DEBUG ### Assertion Error on message {msg_type}:{msg_data}:{msg_address}')
             print_debug_info(e)
 
+
 def load_key(filename):
-    """Attempts to load the private key from the provided file
+    """ Attempts to load a key from the provided file
+        Arguments:
+            filename -> specifies the key file
     """
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
 
 def save_key(key, filename):
-    """Attempts to save the private key to the provided file
+    """ Attempts to save the provided key to the provided file
+        Arguments:
+            key -> the key to be saved
+            filename -> the filename of the saved key
     """
     with open(filename, 'wb') as f:
         pickle.dump(key, f)
 
 
 def save_keystore():
+    """ Saves the keystore to a file identified by the global variable keystore_filename
+    """
     with open(keystore_filename, 'wb') as f:
         pickle.dump(keystore, f)
 
 
 def load_keystore():
+    """ Loads the keystore from the file identified by the global variable keystore_filename
+    """
     with open(keystore_filename, 'rb') as f:
         global keystore
         keystore = pickle.load(f)
 
 
 def resolve_name(name):
+    """ Resolves a name <-> key relation, by querying the keystore dict
+        If no such name <-> key relation is found, returns 'Error'
+        Arguments:
+            name -> identifier of the key in the keystore
+        Returns:
+            the key of the queried name, 'Error' if not found
+    """
     try:
         return keystore[name]
     except KeyError:
@@ -127,6 +155,9 @@ def resolve_name(name):
 
 
 def add_to_keystore(name, key):
+    """ Adds a name <-> key relation to the keystore
+        If the relation is already in the keystore, does nothing
+    """
     try:
         if keystore[name]:
             print('Name already exists, use update if you want to change the respective key')
@@ -137,6 +168,9 @@ def add_to_keystore(name, key):
 
 
 def update_keystore(name, key):
+    """ Updates a name <-> key relation with a new key for the provided name
+        If the provided key equals an empty string, the relation is popped from the keystore
+    """
     if key == '':
         keystore.pop(name)
     keystore[name] = key
@@ -144,6 +178,9 @@ def update_keystore(name, key):
 
 
 def main(argv=sys.argv):
+    """ Main function of the program
+        Provides a CLI for communication with the blockchain node
+    """
 
     port = 6666
     signing_key = None
@@ -204,7 +241,7 @@ def main(argv=sys.argv):
     # gui thread
     gui_thread = threading.Thread(
         target=gui_loop,
-        args=(gui_send_queue, gui_receive_queue),)#daemon=True
+        args=(gui_send_queue, gui_receive_queue),)  # daemon=True
 
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
@@ -220,9 +257,8 @@ def main(argv=sys.argv):
     # User Interaction
     while True:
 
-
-        if(gui_thread.is_alive()): #
-            if(not gui_receive_queue.empty()):
+        if gui_thread.is_alive():
+            if not gui_receive_queue.empty():
                 command = gui_receive_queue.get(block=True)
                 print('Command from GUI: {}'.format(command))
             else:
