@@ -1,3 +1,8 @@
+""" Networking module for the blockchain client,
+    contains all necessary functions to communicate with other clients
+    in the blockchain network, as well as interpret incoming messages
+"""
+
 import pickle  # change for secure solution
 # (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
 import socket

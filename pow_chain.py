@@ -10,11 +10,20 @@ from utils import print_debug_info
 
 
 class PoW_Blockchain(Blockchain):
+    """ Implementation of a Proof-of-Work blockchain
+        Arguments:
+            send_queue -> Queue for messages to other nodes
+    """
+
     def __init__(self, send_queue, difficulty):
         self._difficulty = difficulty
         super().__init__(send_queue)
 
     def new_block(self, block):
+        """ Adds a provided block to the chain after checking it for validity
+            Arguments:
+                block -> The block to be added to the chain
+        """
         if block.index > self.latest_block().index + 1:
             # block higher then current chain:
             # resolve conflict between chains
@@ -34,6 +43,14 @@ class PoW_Blockchain(Blockchain):
             print_debug_info('### DEBUG ### Invalid block')
 
     def validate_block(self, block, last_block):
+        """ Validates a provided block with regards to the previous block in the chain
+            by validating the hash of the previous block and all transactions in the new block
+            Arguments:
+                block -> The block to be validated
+                last_block -> The last block of the chain, upon which validation of the hash is based
+            Returns:
+                the validity (True/False) of the block
+        """
         # check if the hash of the new block is valid
         if block.previous_hash != self.hash(last_block):
             return False
@@ -61,6 +78,15 @@ class PoW_Blockchain(Blockchain):
         return True
 
     def validate_transaction(self, transaction, mining=False):
+        """ Validates a single transaction by validating the signature, the signed hash of the signature
+            and if the transaction amount is covered by the users balance
+            Arguments:
+                  transaction -> The transaction to be validated
+                  mining -> If False, the function invalidates transaction, that are already in the transaction pool
+                            If True, the function checks all transactions in the block being mined
+            Returns:
+                the validity (True/False) of the transaction
+        """
         if not transaction.amount > 0:
             print_debug_info(
                 f'### DEBUG ### Received transaction with amount {transaction.amount} lower or equal to zero')
@@ -113,6 +139,10 @@ class PoW_Blockchain(Blockchain):
             A proof is valid if the hash of the combination of it combined
             with the previous proof has as many leading 0 as set by the
             difficulty
+            Arguments:
+                last_block -> the last block of the chain
+                proof -> the proof for the block being mined
+                miner_key -> the (public) key of the miner
 
             Returns validity(True/False)
         """
@@ -122,6 +152,10 @@ class PoW_Blockchain(Blockchain):
         return test_hash[:difficulty] == '0' * difficulty
 
     def resolve_conflict(self, new_chain):
+        """ Resolves any conflicts that occur with different/outdated chains by accepting the longest valid chain
+            Arguments:
+                new_chain -> the chain to be validated, received by other nodes in the network
+        """
         print_debug_info('### DEBUG ### Resolving conflict')
         if len(self.chain) < len(new_chain):
             # Validate new chain:
@@ -149,6 +183,8 @@ class PoW_Blockchain(Blockchain):
             reaching a difficulty of 4 at ~3k blocks and holding it until ~23k blocks
             Arguments:
                 last_block -> difficulty is scaled upon the index of the last block
+            Returns:
+                the difficulty for the current block
         """
         try:
             difficulty = max(math.floor(math.log(last_block.index)/2), 1)
