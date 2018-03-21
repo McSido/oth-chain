@@ -1,5 +1,7 @@
 # Blockchain for the project-study
 
+[![Build Status](https://travis-ci.org/McSido/oth-chain.svg?branch=master)](https://travis-ci.org/McSido/oth-chain)
+
 ## Instructions
 
 ### Prerequisites
@@ -76,4 +78,4 @@ Messages contain a message-type and message-data
 ### Tests
 
 For testing run py.test -v\
-Additional stress-tests are in  [stress_test.py](./stress_test.py)
+Additional stress-tests are in  [stress-test.py](./stress-test.py)
