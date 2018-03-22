@@ -6,13 +6,13 @@
 import pickle  # change for secure solution
 # (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
 import socket
-import time
 import sys
-from queue import Empty
+import time
 from pprint import pprint
-from utils import print_debug_info
+from queue import Empty
 
 from blockchain import Block, Transaction
+from utils import print_debug_info
 
 # Initialize
 PORT = 6666

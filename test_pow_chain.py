@@ -2,12 +2,13 @@
     of the blockchain client.
 """
 
-from queue import Queue
-import nacl.signing
-import nacl.encoding
-import time
 import hashlib
 import math
+import time
+from queue import Queue
+
+import nacl.encoding
+import nacl.signing
 
 import pow_chain
 

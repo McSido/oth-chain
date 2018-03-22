@@ -2,8 +2,8 @@
     of the blockchain client.
 """
 
-from queue import Queue
 import socket
+from queue import Queue
 
 import networking
 
