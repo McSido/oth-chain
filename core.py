@@ -15,6 +15,7 @@ import nacl.utils
 import hashlib
 import pickle
 import math
+from keystore import Keystore
 from queue import Queue
 from pprint import pprint
 from GUI import *
@@ -36,8 +37,8 @@ networker_command_queue = Queue()
 gui_send_queue = Queue()
 gui_receive_queue = Queue()
 
-keystore = dict()
-keystore_filename = 'keystore'
+# keystore = dict()
+# keystore_filename = 'keystore'
 
 
 def receive_msg(msg_type, msg_data, msg_address, blockchain):
@@ -124,68 +125,17 @@ def save_key(key, filename):
         pickle.dump(key, f)
 
 
-def save_keystore():
-    """ Saves the keystore to a file identified by the global variable keystore_filename
-    """
-    with open(keystore_filename, 'wb') as f:
-        pickle.dump(keystore, f)
-
-
-def load_keystore():
-    """ Loads the keystore from the file identified by the global variable keystore_filename
-    """
-    with open(keystore_filename, 'rb') as f:
-        global keystore
-        keystore = pickle.load(f)
-
-
-def resolve_name(name):
-    """ Resolves a name <-> key relation, by querying the keystore dict
-        If no such name <-> key relation is found, returns 'Error'
-        Arguments:
-            name -> identifier of the key in the keystore
-        Returns:
-            the key of the queried name, 'Error' if not found
-    """
-    try:
-        return keystore[name]
-    except KeyError:
-        print_debug_info('### DEBUG ### Unknown name')
-        return 'Error'
-
-
-def add_to_keystore(name, key):
-    """ Adds a name <-> key relation to the keystore
-        If the relation is already in the keystore, does nothing
-    """
-    try:
-        if keystore[name]:
-            print('Name already exists, use update if you want to change the respective key')
-            return
-    except KeyError:
-        keystore[name] = key
-    save_keystore()
-
-
-def update_keystore(name, key):
-    """ Updates a name <-> key relation with a new key for the provided name
-        If the provided key equals an empty string, the relation is popped from the keystore
-    """
-    if key == '':
-        keystore.pop(name)
-    keystore[name] = key
-    save_keystore()
-
-
-def main(argv=sys.argv):
+def main(argv):
     """ Main function of the program
         Provides a CLI for communication with the blockchain node
     """
 
+    keystore_filename = 'keystore'
+
     port = 6666
     signing_key = None
     try:
-        opts, args = getopt.getopt(argv[1:], 'hdp=k=s=', ['help',  'debug', 'port=', 'key=', 'store='])
+        opts, _ = getopt.getopt(argv[1:], 'hdp=k=s=', ['help',  'debug', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-d/--debug to enable debug prints')
@@ -198,7 +148,7 @@ def main(argv=sys.argv):
             if o in ('-p', '--port'):
                 try:
                     port = int(a)
-                except:
+                except ValueError:
                     print("Port was invalid (e.g. not an int)")
             elif o in ('-k', '--key'):
                 try:
@@ -208,15 +158,8 @@ def main(argv=sys.argv):
                     print('Could not load Key / Key is invalid')
                     print(e)
             elif o in ('-s', '--store'):
-                global keystore_filename
                 keystore_filename = a
-                print(keystore_filename)
-                try:
-                    load_keystore()
-                    print('Keystore successfully loaded')
-                except Exception as e:
-                    print('Could not load Keystore')
-                    print(e)
+                print_debug_info(keystore_filename)
 
     except getopt.GetoptError as err:
         print('for help use --help')
@@ -253,6 +196,9 @@ def main(argv=sys.argv):
 
     verify_key = signing_key.verify_key
     verify_key_hex = verify_key.encode(nacl.encoding.HexEncoder)
+
+    # Initialize Keystore
+    keystore = Keystore(keystore_filename)
 
     # User Interaction
     while True:
@@ -296,7 +242,7 @@ def main(argv=sys.argv):
         elif command == 'exit':
             receive_queue.put(('exit', '', 'local'))
             send_queue.put(None)
-            save_keystore()
+            keystore.save()
             blockchain_thread.join()
             networker.join()
             sys.exit()
@@ -305,10 +251,10 @@ def main(argv=sys.argv):
         elif re.fullmatch(r'transaction \w+ \d+', command):
             t = command.split(' ')
             # Create new Transaction, sender = hex(public_key), signature = signed hash of the transaction
-            if not int(t[2]) > 0:
+            if int(t[2]) <= 0:
                 print('Transactions must contain a amount greater than zero!')
                 continue
-            recipient = resolve_name(t[1])
+            recipient = keystore.resolve_name(t[1])
             if recipient == 'Error':
                 continue
             timestamp = time.time()
@@ -337,19 +283,19 @@ def main(argv=sys.argv):
         elif re.fullmatch(r'import \w+ \w+', command):
             try:
                 t = command.split(' ')
-                if resolve_name(t[2]):
-                    update_keystore(t[2], load_key(t[1]))
+                if keystore.resolve_name(t[2]):
+                    keystore.update_key(t[2], load_key(t[1]))
                 else:
                     print('importing public key')
-                    add_to_keystore(t[1], load_key(t[1]))
+                    keystore.add_key(t[1], load_key(t[1]))
             except Exception as e:
                 print('Could not import key')
                 print(e)
         elif re.fullmatch(r'deletekey \w+', command):
             try:
                 t = command.split(' ')
-                if resolve_name(t[1]):
-                    update_keystore(t[1], '')
+                if keystore.resolve_name(t[1]):
+                    keystore.update_key(t[1], '')
                 else:
                     print(
                         f'Could not delete {t[1]} from keystore. Was it spelt right?')
@@ -370,8 +316,8 @@ def main(argv=sys.argv):
                               'local'))
         elif re.fullmatch(r'balance \w+', command):
             t = command.split(' ')
-            account = resolve_name(t[1])
-            if not account == 'Error':
+            account = keystore.resolve_name(t[1])
+            if account != 'Error':
                 receive_queue.put(('print_balance',
                                    (account, time.time()),
                                    'local'
@@ -390,4 +336,4 @@ def main(argv=sys.argv):
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
