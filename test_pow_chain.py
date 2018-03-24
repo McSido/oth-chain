@@ -13,7 +13,7 @@ import nacl.signing
 import pow_chain
 
 
-class Test_POW():
+class TestPOW():
     """ Testcase used to bundle all tests for the
         Proof-Of-Work blockchain
     """
