@@ -2,7 +2,6 @@ language: python
 python:
   - "3.6"
 install:
-  - pip install pynacl
-  - pip install pyqt5
+  - pip install -r requirements.txt
 script:
   - pytest -v
