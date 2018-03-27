@@ -3,6 +3,8 @@
     in the blockchain network, as well as interpret incoming messages
 """
 
+import ipaddress
+import os
 import pickle  # change for secure solution
 # (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
 import socket
@@ -11,17 +13,15 @@ import time
 from pprint import pprint
 from queue import Empty
 
-from blockchain import Block, Transaction
+from ext_udp import ExtendedUDP
 from utils import print_debug_info
 
 # Initialize
-PORT = 6666
-BUFFER_SIZE = 1024
-peer_list = set()  # Known peers
-active_peers = set()  # Active peers
-unresponsive_peers = set()
-self_address = set()
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+PEER_LIST = set()  # Known peers
+ACTIVE_PEERS = set()  # Active peers
+UNRESPONSIVE_PEERS = set()
+SELF_ADDRESS = set()
+SERVER = ExtendedUDP(1024)
 
 
 def send_msg(msg_type, msg_data, address):
@@ -34,21 +34,7 @@ def send_msg(msg_type, msg_data, address):
 
     message = pack_msg((msg_type, msg_data))
 
-    if len(message) < BUFFER_SIZE:
-        # Simple message
-        server_socket.sendto(b'0' + message, address)
-    else:
-        # Longer message (maybe work with bytes send?)
-        index = (BUFFER_SIZE-1) - 1
-        # Send first part
-        server_socket.sendto(b'1' + message[0:index], address)
-        # Send intermediate parts
-        while index + (BUFFER_SIZE-1) < len(message):
-            server_socket.sendto(
-                b'2' + message[index:index+(BUFFER_SIZE-1)], address)
-            index += (BUFFER_SIZE-1)
-        # Send last part
-        server_socket.sendto(b'3' + message[index:], address)
+    SERVER.send_msg(message, address)
 
 
 def broadcast(msg_type, msg_data):
@@ -58,14 +44,14 @@ def broadcast(msg_type, msg_data):
     msg_data -> Data of the message
     """
 
-    if len(active_peers) == 0:
+    if not ACTIVE_PEERS:
         # If no active peers, try messaging everyone
-        for peer in peer_list:
-            if peer not in self_address:
+        for peer in PEER_LIST:
+            if peer not in SELF_ADDRESS:
                 send_msg(msg_type, msg_data, peer)
 
-    for peer in active_peers:
-        if peer not in self_address:
+    for peer in ACTIVE_PEERS:
+        if peer not in SELF_ADDRESS:
             send_msg(msg_type, msg_data, peer)
 
 
@@ -108,9 +94,9 @@ def process_incoming_msg(msg, in_address, receive_queue):
         elif msg_type == 'N_ping':
             send_msg('N_pong', '', in_address)
         elif msg_type == 'N_pong':
-            active_peers.add(in_address)
+            ACTIVE_PEERS.add(in_address)
             try:
-                unresponsive_peers.remove(in_address)
+                UNRESPONSIVE_PEERS.remove(in_address)
             except KeyError:
                 pass
     else:
@@ -124,7 +110,7 @@ def get_peers(address):
     Arguments:
     address -> Address to send peers to
     """
-    for peer in peer_list:
+    for peer in PEER_LIST:
         send_msg('N_new_peer', peer, address)
 
 
@@ -134,39 +120,52 @@ def new_peer(address):
     Arguments:
     address -> Address of the new peer
     """
-    if (address not in self_address and
-            address not in active_peers.union(unresponsive_peers)):
+    if (address not in SELF_ADDRESS and
+            address not in ACTIVE_PEERS.union(UNRESPONSIVE_PEERS)):
         broadcast('N_new_peer', address)
         get_peers(address)  # Send known peers to new peer
-        peer_list.add(address)
-        unresponsive_peers.add(address)
+        PEER_LIST.add(address)
+        UNRESPONSIVE_PEERS.add(address)
         send_msg('N_ping', '', address)  # check if peer is active
 
 
 def ping_peers():
     """ Ping all peers in peer_list
     """
-    for p in peer_list:
-        if p not in self_address:
-            unresponsive_peers.add(p)
-            send_msg('N_ping', '', p)
+    for peer in PEER_LIST:
+        if peer not in SELF_ADDRESS:
+            UNRESPONSIVE_PEERS.add(peer)
+            send_msg('N_ping', '', peer)
 
 
 def load_initial_peers():
     """ Load initial peers from peers.cfg file
         and add current addresses to self_address
     """
-    # TODO: check for validity (IP-address PORT)
-    with open('./peers.cfg') as f:
-        for peer in f:
-            p = peer.split(' ')
-            assert len(p) == 2
-            peer_list.add((p[0], int(p[1])))
+    if not os.path.exists('./peers.cfg'):
+        print("Could not find peers.cfg\nUpdated with defaults")
+        with open('./peers.cfg', 'w') as peers_file:
+            peers_file.write("127.0.0.1 6666\n")
+            peers_file.write("127.0.0.1 6667")
+            # Change to valid default peers
 
-    self_address.add(('127.0.0.1', PORT))
+    with open('./peers.cfg') as peers_cfg:
+        for peer in peers_cfg:
+            addr = peer.split(' ')
+            try:
+                assert len(addr) == 2
+                ipaddress.ip_address(addr[0])  # Check valid IP
+                if int(addr[1]) > 65535:  # Check valid port
+                    raise ValueError
+            except (ValueError, AssertionError):
+                pass
+            else:
+                PEER_LIST.add((addr[0], int(addr[1])))
+
+    SELF_ADDRESS.add(('127.0.0.1', SERVER.port))
     hostname = socket.gethostname()
     IP = socket.gethostbyname(hostname)
-    self_address.add((IP, PORT))
+    SELF_ADDRESS.add((IP, SERVER))
 
 
 def example_worker(send_queue, receive_queue, command_queue):
@@ -176,11 +175,9 @@ def example_worker(send_queue, receive_queue, command_queue):
     receive_queue -> Queue for messages to the attached blockchain
     """
     # Setup peers
-    global active_peers
     load_initial_peers()
     ping_peers()
     counter = 0
-    received_data = {}
 
     # Main loop
     while True:
@@ -188,15 +185,15 @@ def example_worker(send_queue, receive_queue, command_queue):
             cmd = command_queue.get(block=False)
             if cmd == 'print_peers':
                 print('all peers:')
-                pprint(peer_list)
+                pprint(PEER_LIST)
                 print('active peers:')
-                pprint(active_peers)
+                pprint(ACTIVE_PEERS)
         except Empty:
             pass
         try:
             msg = send_queue.get(block=False)
             if msg is None:
-                server_socket.close()
+                SERVER.teardown()
                 sys.exit()
             msg_out_type, msg_out_data, msg_out_address = msg
         except Empty:
@@ -207,55 +204,17 @@ def example_worker(send_queue, receive_queue, command_queue):
             else:
                 send_msg(msg_out_type, msg_out_data, msg_out_address)
 
-        try:
-            msg_in, address = server_socket.recvfrom(BUFFER_SIZE)
-            if msg_in[0:1] == b'0':
-                # unsplit message
-                received_data[address] = (True, msg_in[1:])
-            elif msg_in[0:1] == b'1':
-                # beginning of split message
-                if address in received_data.keys():
-                    # remove old unfinished message
-                    received_data.pop(address)
-                received_data[address] = (False, msg_in[1:])
-            elif msg_in[0:1] == b'2':
-                # middle of split message
-                if (address in received_data.keys() and
-                        received_data[address][0] is False):
-                    received_data[address] = (
-                        False, received_data[address][1]+msg_in[1:])
-            elif msg_in[0:1] == b'3':
-                # end of split message
-                if (address in received_data.keys() and
-                        received_data[address][0] is False):
-                    received_data[address] = (
-                        True, received_data[address][1]+msg_in[1:])
-            else:
-                # No useful message
-                if address in received_data.keys():
-                    # remove old unfinished message
-                    received_data.pop(address)
-                continue
-
-            # print(received_data.items())
-            # check for finished message
-            for ad, (finished, msg) in received_data.items():
-                # print(ad, finished, msg)
-                if finished:
-                    process_incoming_msg(msg, ad, receive_queue)
-                    received_data.pop(ad)
-                    break  # Only 1 message should be finished per cycle
-
-        except socket.error:
-            pass
-        else:
+        received = SERVER.receive_msg()
+        if received:
+            process_incoming_msg(received[0], received[1], receive_queue)
             # Add unknown node
-            if address not in active_peers:
-                new_peer(address)
+            if received[1] not in ACTIVE_PEERS:
+                new_peer(received[1])
 
         if counter == 100*10:  # ~ 10-20 sec
-            active_peers = peer_list.difference(unresponsive_peers)
-            unresponsive_peers.clear()
+            ACTIVE_PEERS.clear()
+            ACTIVE_PEERS.update(PEER_LIST.difference(UNRESPONSIVE_PEERS))
+            UNRESPONSIVE_PEERS.clear()
         elif counter == 100*60:  # ~ 1-2 min
             ping_peers()
             counter = 0
@@ -281,9 +240,6 @@ def worker(send_queue, receive_queue, command_queue, port=6666):
     #   -- Networking message (e.g. new peer, get peers)
     #   -- Blockchain message: put on receive_queue
 
-    global PORT
-    PORT = port
-    server_socket.bind(('', PORT))
-    server_socket.settimeout(0.01)
+    SERVER.setup(port)
 
     example_worker(send_queue, receive_queue, command_queue)
