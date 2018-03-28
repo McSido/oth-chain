@@ -57,23 +57,7 @@ class TestPOW():
         """ Test that the transactions with invalid balances are recognized and
             not added to the blockchain
         """
-        amount = 10
-        timestamp = time.time()
-
-        fee = math.ceil(amount * 0.05)
-        transaction_hash = hashlib.sha256(
-            (str(self.sender_verify) + str(self.receiver_verify) +
-             str(amount) + str(fee) + str(timestamp)).encode()
-        ).hexdigest()
-
-        transaction = pow_chain.Transaction(
-            self.sender_verify,
-            self.receiver_verify,
-            amount,
-            fee,
-            timestamp,
-            self.sender_sign.sign(transaction_hash.encode())
-        )
+        transaction = self.create_transaction()
 
         assert not self.blockchain.validate_transaction(transaction)
 
@@ -88,22 +72,20 @@ class TestPOW():
         """
         self.mine_block()
 
-        amount = 10
-        timestamp = time.time()
-
-        fee = math.ceil(amount * 0.05)
-        transaction_hash = hashlib.sha256(
-            (str(self.sender_verify) + str(self.receiver_verify) +
-             str(amount) + str(fee) + str(timestamp)).encode()
-        ).hexdigest()
-
+        transaction = self.create_transaction()
         transaction = pow_chain.Transaction(
-            self.sender_verify,
-            self.receiver_verify,
-            amount,
-            fee,
-            timestamp,
-            self.receiver_sign.sign(transaction_hash.encode())
+            transaction.sender,
+            transaction.recipient,
+            transaction.amount,
+            transaction.fee,
+            transaction.timestamp,
+            self.receiver_sign.sign(
+                self.create_transaction_hash(
+                    transaction.amount,
+                    transaction.fee,
+                    transaction.timestamp
+                ).encode()
+            )
         )
 
         assert not self.blockchain.validate_transaction(transaction)
@@ -118,23 +100,7 @@ class TestPOW():
         """
         self.mine_block()
 
-        amount = 10
-        timestamp = time.time()
-
-        fee = math.ceil(amount * 0.05)
-        transaction_hash = hashlib.sha256(
-            (str(self.sender_verify) + str(self.receiver_verify) +
-             str(amount) + str(fee) + str(timestamp)).encode()
-        ).hexdigest()
-
-        transaction = pow_chain.Transaction(
-            self.sender_verify,
-            self.receiver_verify,
-            amount,
-            fee,
-            timestamp,
-            self.sender_sign.sign(transaction_hash.encode())
-        )
+        transaction = self.create_transaction()
 
         assert self.blockchain.validate_transaction(transaction)
 
@@ -151,23 +117,7 @@ class TestPOW():
         """
         self.mine_block()
 
-        amount = 10
-        timestamp = time.time()
-
-        fee = math.ceil(amount * 0.05)
-        transaction_hash = hashlib.sha256(
-            (str(self.sender_verify) + str(self.receiver_verify) +
-             str(amount) + str(fee) + str(timestamp)).encode()
-        ).hexdigest()
-
-        transaction = pow_chain.Transaction(
-            self.sender_verify,
-            self.receiver_verify,
-            amount,
-            fee,
-            timestamp,
-            self.sender_sign.sign(transaction_hash.encode())
-        )
+        transaction = self.create_transaction()
 
         assert self.blockchain.validate_transaction(transaction)
 
@@ -191,3 +141,30 @@ class TestPOW():
                                   signature='0'))
         self.blockchain.new_block(block)
         self.sends.get(timeout=1)  # Remove new_block message
+
+    def create_transaction(self):
+        """ Create simple transaction used in tests
+        """
+
+        amount = 10
+        timestamp = time.time()
+        fee = math.ceil(amount * 0.05)
+
+        transaction_hash = self.create_transaction_hash(amount, fee, timestamp)
+
+        return pow_chain.Transaction(
+            self.sender_verify,
+            self.receiver_verify,
+            amount,
+            fee,
+            timestamp,
+            self.sender_sign.sign(transaction_hash.encode())
+        )
+
+    def create_transaction_hash(self, amount, fee, timestamp):
+        """ Creates the transaction-hash used in tests
+        """
+        return hashlib.sha256(
+            (str(self.sender_verify) + str(self.receiver_verify) +
+             str(amount) + str(fee) + str(timestamp)).encode()
+        ).hexdigest()
