@@ -109,13 +109,11 @@ class PoW_Blockchain(Blockchain):
                 if balance >= transaction.amount + transaction.fee:
                     print_debug_info('### DEBUG ### Balance sufficient, transaction is valid')
                     return True
-                else:
-                    print_debug_info('### DEBUG ### Balance insufficient, transaction is invalid')
-                    print_debug_info(f'Transaction at fault: {transaction} was not covered by balance: {balance}')
-                    return False
-            else:
-                print_debug_info('### DEBUG ### Wrong Hash')
+                print_debug_info('### DEBUG ### Balance insufficient, transaction is invalid')
+                print_debug_info(f'Transaction at fault: {transaction} was not covered by balance: {balance}')
                 return False
+            print_debug_info('### DEBUG ### Wrong Hash')
+            return False
 
         except BadSignatureError:
             print_debug_info('### DEBUG ### Bad Signature, Validation Failed')
