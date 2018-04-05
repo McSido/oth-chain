@@ -3,12 +3,25 @@
 """
 
 from queue import Queue
-import socket
 
+from ext_udp import ExtendedUDP
 import networking
 
-networking.server_socket.bind(('', 6666))
-networking.server_socket.settimeout(0.01)
+networking.SERVER.setup(6666)
+
+RECEIVER = ExtendedUDP()
+
+
+def setup():
+    """ Setup RECEIVER for tests
+    """
+    RECEIVER.setup(6667)
+
+
+def teardown():
+    """ Teardown RECEIVER for tests
+    """
+    RECEIVER.teardown()
 
 
 def test_packing():
@@ -43,19 +56,13 @@ def test_unsplit_messaging():
         Test for unsplit messages (msg < BUFFER_SIZE)
     """
 
-    receive_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    receive_socket.bind(('', 6667))
-
     msg = ('test-msg', 'test-data')
 
     networking.send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
 
-    received = receive_socket.recv(networking.BUFFER_SIZE)
+    received = RECEIVER.receive_msg()
 
-    # Check unsplit message
-    assert received[0:1] == b'0'
-    # Check content
-    assert networking.unpack_msg(received[1:]) == (msg[0], msg[1])
+    assert networking.unpack_msg(received[0]) == (msg[0], msg[1])
 
 
 def test_split_messaging_2():
@@ -63,31 +70,19 @@ def test_split_messaging_2():
 
         Test for split (2-parts) messages (msg > BUFFER_SIZE)
     """
-    receive_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    receive_socket.bind(('', 6667))
 
-    msg = ('test-msg', b'1' * (networking.BUFFER_SIZE + 10))
+    msg = ('test-msg', b'1' * (networking.SERVER.buffersize + 10))
 
     networking.send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
 
-    # Check first part
+    received = RECEIVER.receive_msg()
 
-    received = receive_socket.recv(networking.BUFFER_SIZE)
+    assert received is None
 
-    assert received[0:1] == b'1'
-
-    received_msg = received[1:]
-
-    # Check second/last part
-
-    received = receive_socket.recv(networking.BUFFER_SIZE)
-
-    assert received[0:1] == b'3'
-
-    received_msg = received_msg + received[1:]
+    received = RECEIVER.receive_msg()
 
     # Check content
-    assert networking.unpack_msg(received_msg) == (msg[0], msg[1])
+    assert networking.unpack_msg(received[0]) == (msg[0], msg[1])
 
 
 def test_split_messaging_3():
@@ -95,36 +90,19 @@ def test_split_messaging_3():
 
         Test for split (3-parts) messages (msg >> BUFFER_SIZE)
     """
-    receive_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    receive_socket.bind(('', 6667))
-
-    msg = ('test-msg', b'1' * (2 * networking.BUFFER_SIZE + 10))
+    msg = ('test-msg', b'1' * (2 * networking.SERVER.buffersize + 10))
 
     networking.send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
 
-    # Check first part
+    received = RECEIVER.receive_msg()
 
-    received = receive_socket.recv(networking.BUFFER_SIZE)
+    assert received is None
 
-    assert received[0:1] == b'1'
+    received = RECEIVER.receive_msg()
 
-    received_msg = received[1:]
+    assert received is None
 
-    # Check second part
-
-    received = receive_socket.recv(networking.BUFFER_SIZE)
-
-    assert received[0:1] == b'2'
-
-    received_msg = received_msg + received[1:]
-
-    # Check last part
-
-    received = receive_socket.recv(networking.BUFFER_SIZE)
-
-    assert received[0:1] == b'3'
-
-    received_msg = received_msg + received[1:]
+    received = RECEIVER.receive_msg()
 
     # Check content
-    assert networking.unpack_msg(received_msg) == (msg[0], msg[1])
+    assert networking.unpack_msg(received[0]) == (msg[0], msg[1])
