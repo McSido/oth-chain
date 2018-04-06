@@ -41,57 +41,27 @@ gui_receive_queue = Queue()
 # keystore_filename = 'keystore'
 
 
-def receive_msg(msg_type, msg_data, msg_address, blockchain):
+def receive_msg(msg_type, msg_data, msg_address, blockchain, processor):
     """ Call blockchain functionality for received messages
     Arguments:
     msg_type -> String containing the type of the message
-    msg_type -> Data contained by the message
+    msg_data -> Data contained by the message
     msg_address -> Address of message sender
     blockchain -> Blockchain that provides the functionality
     """
-    if msg_type == 'new_block':
-        assert isinstance(msg_data, Block)
-        blockchain.new_block(msg_data)
 
-    elif msg_type == 'new_transaction':
-        # ignore mining transactions (those are stored immediately in the mined block)
-        assert isinstance(msg_data, Transaction)
-        if not msg_data.sender == '0':
-            blockchain.new_transaction(msg_data)
-
-    elif msg_type == 'mine' and msg_address == 'local':
-        proof = blockchain.create_proof(msg_data)
-        block = blockchain.create_block(proof)
-        # Calculate the transaction fees - Maybe exclude transactions where the miner == the sender/recipient?
-        fee_sum = 0
-        for transaction in block.transactions:
-            fee_sum += transaction.fee
-        reward_multiplicator = math.floor(block.index / 10) - 1
-        mining_reward = 50 >> 2**reward_multiplicator if reward_multiplicator >= 0 else 50
-        block.transactions.append(
-            Transaction(sender='0', recipient=msg_data,
-                        amount=mining_reward+fee_sum, fee=0, timestamp=time.time(), signature='0'))
-        blockchain.new_block(block)
-
-    elif msg_type == 'get_newest_block':
+    if msg_type == 'get_newest_block':
         block = blockchain.latest_block()
         send_queue.put(('new_block', block, msg_address))
-
     elif msg_type == 'get_chain':
         send_queue.put(('resolve_conflict', blockchain.chain, msg_address))
-
-    elif msg_type == 'resolve_conflict':
-        assert isinstance(msg_data, list)
-        blockchain.resolve_conflict(msg_data)
-
-    elif msg_type == 'print_balance' and msg_address == 'local':
-        print(f'Current Balance: {blockchain.check_balance(msg_data[0], msg_data[1])}')
-
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
+    else:
+        processor(msg_type, msg_data, msg_address)
 
 
-def blockchain_loop(blockchain):
+def blockchain_loop(blockchain, processor):
     """ The main loop of the blockchain thread, receives messages and processes them
         Arguments:
             blockchain -> the blockchain upon which to operate
@@ -100,7 +70,7 @@ def blockchain_loop(blockchain):
         msg_type, msg_data, msg_address = receive_queue.get()
         print_debug_info('### DEBUG ### Processing: ' + msg_type)
         try:
-            receive_msg(msg_type, msg_data, msg_address, blockchain)
+            receive_msg(msg_type, msg_data, msg_address, blockchain, processor)
         except AssertionError as e:
             print_debug_info(f'### DEBUG ### Assertion Error on message {msg_type}:{msg_data}:{msg_address}')
             print_debug_info(e)
@@ -168,6 +138,7 @@ def main(argv):
 
     # Create proof-of-work blockchain
     my_blockchain = PoW_Blockchain(send_queue, 4)
+    my_blockchain_processor = my_blockchain.process_message()
 
     # Create networking thread
     networker = threading.Thread(
@@ -178,7 +149,7 @@ def main(argv):
     # Main blockchain loop
     blockchain_thread = threading.Thread(
         target=blockchain_loop,
-        args=(my_blockchain,))
+        args=(my_blockchain, my_blockchain_processor))
     blockchain_thread.start()
 
     # gui thread

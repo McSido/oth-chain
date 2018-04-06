@@ -3,6 +3,7 @@ import nacl.signing
 import nacl.encoding
 import math
 
+import time
 from nacl.exceptions import BadSignatureError
 
 from blockchain import Block, Blockchain, Transaction
@@ -189,6 +190,51 @@ class PoW_Blockchain(Blockchain):
         except ValueError:
             difficulty = 1
         return difficulty
+
+    def process_message(self):
+
+        def new_block_inner(msg_data, _):
+            assert isinstance(msg_data, Block)
+            self.new_block(msg_data)
+
+        def new_transaction_inner(msg_data, _):
+            assert isinstance(msg_data, Transaction)
+            if msg_data.sender != '0':
+                self.new_transaction(msg_data)
+
+        def mine(msg_data, msg_address):
+            if msg_address != 'local': return
+            proof = self.create_proof(msg_data)
+            block = self.create_block(proof)
+            fee_sum = 0
+            for transaction in block.transactions:
+                fee_sum += transaction.fee
+            reward_multiplier = math.floor(block.index / 10) - 1
+            mining_reward = 50 >> 2**reward_multiplier if reward_multiplier >= 0 else 50
+            block.transactions.append(
+                Transaction(sender='0', recipient=msg_data,
+                            amount=mining_reward+fee_sum, fee=0, timestamp=time.time(), signature='0' ))
+            self.new_block(block)
+
+        def resolve_conflict_inner(msg_data, _):
+            assert isinstance(msg_data, list)
+            self.resolve_conflict(msg_data)
+
+        def print_balance(msg_data, _):
+            print(f'Current Balance: {self.check_balance(msg_data[0], msg_data[1])}')
+
+        commands = {
+            'new_block': new_block_inner,
+            'new_transaction': new_transaction_inner,
+            'mine': mine,
+            'resolve_conflict': resolve_conflict_inner,
+            'print_balance': print_balance
+        }
+
+        def processor(msg_type, msg_data, msg_address):
+            commands[msg_type](msg_data, msg_address)
+
+        return processor
 
     @property
     def difficulty(self):

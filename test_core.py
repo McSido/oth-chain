@@ -19,6 +19,7 @@ class TestCore():
         self.test_obj = test_pow_chain.TestPOW()
         self.test_obj.setup()
         self.chain = self.test_obj.blockchain
+        self.processor = self.chain.process_message()
         self.chain.send_queue = core.send_queue
         self.address = ('0.0.0.0', '2323')
 
@@ -33,7 +34,8 @@ class TestCore():
             'new_block',
             block,
             self.address,
-            self.chain
+            self.chain,
+            self.processor
         )
         assert block in self.chain.chain
         assert not core.send_queue.empty()
@@ -58,7 +60,8 @@ class TestCore():
             'mine',
             self.test_obj.sender_verify,
             'local',
-            self.chain
+            self.chain,
+            self.processor
         )
         assert not core.send_queue.empty()
         send_msg = core.send_queue.get(block=False)
@@ -76,7 +79,8 @@ class TestCore():
             'get_newest_block',
             '',
             self.address,
-            self.chain
+            self.chain,
+            self.processor
         )
         assert not core.send_queue.empty()
         send_msg = core.send_queue.get(block=False)
@@ -93,7 +97,8 @@ class TestCore():
             'get_chain',
             '',
             self.address,
-            self.chain
+            self.chain,
+            self.processor
         )
         assert not core.send_queue.empty()
         send_msg = core.send_queue.get(block=False)
@@ -107,7 +112,8 @@ class TestCore():
             'resolve_conflict',
             send_msg[1],
             self.address,
-            self.chain
+            self.chain,
+            self.processor
         )
         assert self.chain.chain == copied_chain
 
@@ -120,7 +126,8 @@ class TestCore():
             'print_balance',
             (self.test_obj.sender_verify, curr_time),
             'local',
-            self.chain
+            self.chain,
+            self.processor
         )
 
         captured = capsys.readouterr()

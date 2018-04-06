@@ -141,6 +141,9 @@ class Blockchain (object):
         """
         raise NotImplementedError
 
+    def process_message(self):
+        raise NotImplementedError
+
     def latest_block(self):
         """ Get the latest block
 
