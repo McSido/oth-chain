@@ -15,6 +15,7 @@ import nacl.utils
 import hashlib
 import pickle
 import math
+import cli
 from keystore import Keystore
 from queue import Queue
 from pprint import pprint
@@ -36,6 +37,7 @@ networker_command_queue = Queue()
 # queue for exchanging values between gui
 gui_send_queue = Queue()
 gui_receive_queue = Queue()
+
 
 # keystore = dict()
 # keystore_filename = 'keystore'
@@ -105,7 +107,7 @@ def main(argv):
     port = 6666
     signing_key = None
     try:
-        opts, _ = getopt.getopt(argv[1:], 'hdp=k=s=', ['help',  'debug', 'port=', 'key=', 'store='])
+        opts, _ = getopt.getopt(argv[1:], 'hdp=k=s=', ['help', 'debug', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-d/--debug to enable debug prints')
@@ -155,7 +157,7 @@ def main(argv):
     # gui thread
     gui_thread = threading.Thread(
         target=gui_loop,
-        args=(gui_send_queue, gui_receive_queue),)  # daemon=True
+        args=(gui_send_queue, gui_receive_queue), )  # daemon=True
 
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
@@ -171,6 +173,9 @@ def main(argv):
     # Initialize Keystore
     keystore = Keystore(keystore_filename)
 
+    # Initialize CLI
+    command_line_interface = cli.CLI()
+
     # User Interaction
     while True:
 
@@ -182,7 +187,7 @@ def main(argv):
                 continue
         else:
             print('Action: ')
-            
+
             try:
                 command = input()
             except KeyboardInterrupt:
@@ -283,8 +288,8 @@ def main(argv):
                 print(e)
         elif command == 'balance':
             receive_queue.put(('print_balance',
-                              (verify_key_hex, time.time()),
-                              'local'))
+                               (verify_key_hex, time.time()),
+                               'local'))
         elif re.fullmatch(r'balance \w+', command):
             t = command.split(' ')
             account = keystore.resolve_name(t[1])
