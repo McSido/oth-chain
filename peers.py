@@ -8,6 +8,12 @@ import time
 
 
 class PeerManager():
+    """ PeerManager that handles all aspects of
+        the Peer2Peer connections
+
+        Call setup() before use
+    """
+
     def __init__(self):
         self._peer_list = set()
         self._last_seen = {}
@@ -16,10 +22,23 @@ class PeerManager():
         self._send_queue = None
 
     def setup(self, send_queue, port):
+        """ Setup PeerManager
+            Loads initial peers from peers.cfg,
+            creates the file if needed
+
+            Arguments:
+                send_queue -> Queue for messaging other nodes
+                port -> Port of the node
+        """
         self._send_queue = send_queue
         self._init_peers(port)
 
     def _init_peers(self, port):
+        """ Initialize peers
+
+            Arguments:
+                port -> Port of the node
+        """
         self._self_addresses.add(('127.0.0.1', port))
         hostname = socket.gethostname()
         host_ip = socket.gethostbyname(hostname)
@@ -53,6 +72,13 @@ class PeerManager():
                     self.peer_inferred((addr[0], int(addr[1])))
 
     def _update_active_peers(self):
+        """ Check for inactive peers
+
+            inactive:  > 60 sec between messages
+
+            Pings inactive peers and removes them
+            from the active peers list
+        """
         cur_time = time.time()
         to_remove = set()
 
@@ -65,6 +91,11 @@ class PeerManager():
             self._active_peers.discard(addr)
 
     def get_broadcast_peers(self):
+        """ Get the peers that sould receive
+            broadcast messages
+
+            Returns list of addresses
+        """
         self._update_active_peers()
 
         if not self._active_peers:
@@ -72,6 +103,16 @@ class PeerManager():
         return self._active_peers
 
     def peer_inferred(self, address):
+        """ Add new inferred peer
+            Infer peers by e.g. receiving
+            'N_new_peer' messages
+
+            Puts ping message on send_queue to
+            receive confirmation
+
+            Arguments:
+                address -> address of peer
+        """
         if address in self._self_addresses:
             return
         if address not in self._peer_list:
@@ -79,6 +120,16 @@ class PeerManager():
             self._send_queue.put(('N_ping', '', address))
 
     def peer_seen(self, address):
+        """ Add new seen/active peer
+            Seen/Active peer is a peer that
+            directly messaged this node
+
+            Puts message on send_queue to
+            receive additional peers from the new peer
+
+            Arguments:
+                address -> address of peer
+        """
         if address in self._self_addresses:
             return
         if address not in self._active_peers:
@@ -89,7 +140,21 @@ class PeerManager():
         self._last_seen[address] = time.time()
 
     def get_all_peers(self):
+        """ Get all peers
+
+            For information only!
+            Use get_broadcast_peers() instead
+
+            Returns list of all peers
+        """
         return self._peer_list
 
     def get_active_peers(self):
+        """ Get active peers
+
+            For information only!
+            Use get_broadcast_peers() instead
+
+            Returns list of active peers
+        """
         return self._active_peers

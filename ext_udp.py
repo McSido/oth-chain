@@ -15,6 +15,9 @@ class ExtendedUDP():
 
         Does not handle out-of-order messages
 
+        Call setup() before use and
+        teardown() after use
+
         Arguments:
             buffersize -> Buffersize of the socket (default=1024)
     """
