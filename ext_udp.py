@@ -8,12 +8,15 @@
 import socket
 
 
-class ExtendedUDP(object):
+class ExtendedUDP():
     """ Implementation of an extended UDP socket
         Can send/receive messages that are bigger
         than the buffersize
 
         Does not handle out-of-order messages
+
+        Call setup() before use and
+        teardown() after use
 
         Arguments:
             buffersize -> Buffersize of the socket (default=1024)
@@ -50,14 +53,14 @@ class ExtendedUDP(object):
             self.socket.sendto(b'0' + msg, address)
         else:
             # Longer message (maybe take bytes_send into consideration?)
-            index = (self.buffersize-1) - 1
+            index = (self.buffersize - 1) - 1
             # Send first part
             self.socket.sendto(b'1' + msg[0:index], address)
             # Send intermediate parts
-            while index + (self.buffersize-1) < len(msg):
+            while index + (self.buffersize - 1) < len(msg):
                 self.socket.sendto(
-                    b'2' + msg[index:index+(self.buffersize-1)], address)
-                index += (self.buffersize-1)
+                    b'2' + msg[index:index + (self.buffersize - 1)], address)
+                index += (self.buffersize - 1)
             # Send last part
             self.socket.sendto(b'3' + msg[index:], address)
 
@@ -89,13 +92,13 @@ class ExtendedUDP(object):
                 if (address in self.received_data.keys() and
                         self.received_data[address][0] is False):
                     self.received_data[address] = (
-                        False, self.received_data[address][1]+msg_in[1:])
+                        False, self.received_data[address][1] + msg_in[1:])
             elif msg_in[0:1] == b'3':
                 # end of split message
                 if (address in self.received_data.keys() and
                         self.received_data[address][0] is False):
                     self.received_data[address] = (
-                        True, self.received_data[address][1]+msg_in[1:])
+                        True, self.received_data[address][1] + msg_in[1:])
             else:
                 # No useful message
                 if address in self.received_data.keys():

@@ -107,3 +107,6 @@ venv.bak/
 # IDE settings
 .vscode/
 .idea/
+
+# Keys
+keystore
