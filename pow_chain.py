@@ -1,4 +1,6 @@
 import hashlib
+from pprint import pprint
+
 import nacl.signing
 import nacl.encoding
 import math
@@ -16,8 +18,7 @@ class PoW_Blockchain(Blockchain):
             send_queue -> Queue for messages to other nodes
     """
 
-    def __init__(self, send_queue, difficulty):
-        self._difficulty = difficulty
+    def __init__(self, send_queue):
         super().__init__(send_queue)
 
     def new_block(self, block):
@@ -203,7 +204,8 @@ class PoW_Blockchain(Blockchain):
                 self.new_transaction(msg_data)
 
         def mine(msg_data, msg_address):
-            if msg_address != 'local': return
+            if msg_address != 'local':
+                return
             proof = self.create_proof(msg_data)
             block = self.create_block(proof)
             fee_sum = 0
@@ -218,17 +220,30 @@ class PoW_Blockchain(Blockchain):
 
         def resolve_conflict_inner(msg_data, _):
             assert isinstance(msg_data, list)
+            assert all(isinstance(block, Block) for block in msg_data)
             self.resolve_conflict(msg_data)
 
         def print_balance(msg_data, _):
             print(f'Current Balance: {self.check_balance(msg_data[0], msg_data[1])}')
+
+        def save_chain(_, msg_address):
+            if msg_address != 'local':
+                return
+            self.save_chain()
+
+        def dump_vars(_, msg_address):
+            if msg_address != 'local':
+                return
+            pprint(vars(self))
 
         commands = {
             'new_block': new_block_inner,
             'new_transaction': new_transaction_inner,
             'mine': mine,
             'resolve_conflict': resolve_conflict_inner,
-            'print_balance': print_balance
+            'print_balance': print_balance,
+            'save': save_chain,
+            'dump': dump_vars,
         }
 
         def processor(msg_type, msg_data, msg_address):
@@ -241,9 +256,3 @@ class PoW_Blockchain(Blockchain):
         """ Get current difficulty of the blockchain
         """
         return self.scale_difficulty(self.chain[-1])
-
-    @difficulty.setter
-    def difficulty(self, difficulty):
-        """ Change difficulty of the blockchain
-        """
-        self._difficulty = difficulty

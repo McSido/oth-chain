@@ -5,8 +5,6 @@
 """
 
 import re
-import sys
-import threading
 import getopt
 import time
 import nacl.encoding
@@ -17,13 +15,10 @@ import pickle
 import math
 import cli
 from keystore import Keystore
-from queue import Queue
-from pprint import pprint
 from GUI import *
 
-import blockchain
 import networking
-from pow_chain import Block, PoW_Blockchain, Transaction
+from pow_chain import PoW_Blockchain, Transaction
 from utils import print_debug_info, set_debug
 
 # Create queues for message transfer blockchain<->networking
@@ -97,13 +92,8 @@ def save_key(key, filename):
         pickle.dump(key, f)
 
 
-def main(argv):
-    """ Main function of the program
-        Provides a CLI for communication with the blockchain node
-    """
-
+def parse_args(argv):
     keystore_filename = 'keystore'
-
     port = 6666
     signing_key = None
     try:
@@ -138,8 +128,12 @@ def main(argv):
         print(err)
         sys.exit()
 
+    return keystore_filename, port, signing_key
+
+
+def init(keystore_filename, port, signing_key):
     # Create proof-of-work blockchain
-    my_blockchain = PoW_Blockchain(send_queue, 4)
+    my_blockchain = PoW_Blockchain(send_queue)
     my_blockchain_processor = my_blockchain.process_message()
 
     # Create networking thread
@@ -172,6 +166,15 @@ def main(argv):
 
     # Initialize Keystore
     keystore = Keystore(keystore_filename)
+
+    return keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread
+
+
+def main(argv):
+    """ Main function of the program
+        Provides a CLI for communication with the blockchain node
+    """
+    keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread = init(*parse_args(argv))
 
     # Initialize CLI
     command_line_interface = cli.CLI()
@@ -244,8 +247,9 @@ def main(argv):
                                'local'
                                ))
         elif command == 'dump':
-            gui_send_queue.put(vars(my_blockchain))
-            pprint(vars(my_blockchain))
+            # gui_send_queue.put(vars(my_blockchain))
+            # pprint(vars(my_blockchain))
+            receive_queue.put(('dump', '', 'local'))
         elif command == 'peers':
             networker_command_queue.put('print_peers')
         elif re.fullmatch(r'key \w+', command):
@@ -299,10 +303,10 @@ def main(argv):
                                    'local'
                                    ))
         elif command == 'save':
-            pprint('saving to file named bc_file.txt')
-            with open('bc_file.txt', 'wb') as output:
-                pickle.dump(my_blockchain.chain, output,
-                            pickle.HIGHEST_PROTOCOL)  # Threadsafe?
+            receive_queue.put(('save',
+                               '',
+                               'local'
+                               ))
         elif command == 'gui':
             print("open gui")
             gui_thread.start()

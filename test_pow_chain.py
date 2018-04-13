@@ -22,7 +22,7 @@ class TestPOW():
         """ Setup of the blockchain for the tests
         """
         self.sends = Queue()
-        self.blockchain = pow_chain.PoW_Blockchain(self.sends, 0)
+        self.blockchain = pow_chain.PoW_Blockchain(self.sends)
         self.sender_sign = nacl.signing.SigningKey(seed=b'a'*32)
         self.sender_verify = self.sender_sign.verify_key.encode(
             nacl.encoding.HexEncoder)

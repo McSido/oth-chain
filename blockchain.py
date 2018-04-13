@@ -2,6 +2,7 @@ import os
 import pickle
 import hashlib
 from collections import namedtuple
+from pprint import pprint
 from time import time
 from pathlib import Path
 from utils import print_debug_info
@@ -56,6 +57,12 @@ class Blockchain (object):
             # If file doesn't exist / is empty:
             # Create genesis block
             self.chain.append(Block(0, 768894480, [], 0, 0))
+
+    def save_chain(self):
+        pprint('saving to file named bc_file.txt')
+        with open('bc_file.txt', 'wb') as output:
+            pickle.dump(self.chain, output,
+                        pickle.HIGHEST_PROTOCOL)
 
     def new_transaction(self, transaction):
         """ Add a new transaction to the blockchain
