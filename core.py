@@ -1,23 +1,25 @@
-""" Core module of the blockchain client
-    contains the main function of the program,
-    as well as a target function for the blockchain thread
-    Also contains various functions for private/public keys
+""" Core module of the blockchain client.
+
+Contains the main function of the program,
+as well as a target function for the blockchain thread.
+
+Also contains various functions for private/public keys.
 """
 
-import re
 import getopt
+import hashlib
+import math
+import pickle
+import re
 import time
 import nacl.encoding
 import nacl.signing
 import nacl.utils
-import hashlib
-import pickle
-import math
-import cli
-from keystore import Keystore
-from GUI import *
 
+import cli
 import networking
+from GUI import *
+from keystore import Keystore
 from pow_chain import PoW_Blockchain, Transaction
 from utils import print_debug_info, set_debug
 
@@ -39,12 +41,14 @@ gui_receive_queue = Queue()
 
 
 def receive_msg(msg_type, msg_data, msg_address, blockchain, processor):
-    """ Call blockchain functionality for received messages
-    Arguments:
-    msg_type -> String containing the type of the message
-    msg_data -> Data contained by the message
-    msg_address -> Address of message sender
-    blockchain -> Blockchain that provides the functionality
+    """ Call blockchain functionality for received messages.
+
+    Args:
+        msg_type: String containing the type of the message.
+        msg_data: Data contained by the message.
+        msg_address: Address of message sender.
+        blockchain: Blockchain that provides the functionality.
+        processor: Processor that handles blockchain messages.
     """
 
     if msg_type == 'get_newest_block':
@@ -59,45 +63,59 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain, processor):
 
 
 def blockchain_loop(blockchain, processor):
-    """ The main loop of the blockchain thread, receives messages and processes them
-        Arguments:
-            blockchain -> the blockchain upon which to operate
+    """ The main loop of the blockchain thread.
+
+    Receives messages and processes them.
+
+    Args:
+        blockchain: The blockchain upon which to operate.
+        processer: Processer used to handle blockchain messages.
     """
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
-        print_debug_info('### DEBUG ### Processing: ' + msg_type)
+        print_debug_info('Processing: ' + msg_type)
         try:
             receive_msg(msg_type, msg_data, msg_address, blockchain, processor)
         except AssertionError as e:
-            print_debug_info(f'### DEBUG ### Assertion Error on message {msg_type}:{msg_data}:{msg_address}')
+            print_debug_info(
+                f'Assertion Error on message\
+                 {msg_type}:{msg_data}:{msg_address}')
             print_debug_info(e)
 
 
 def load_key(filename):
-    """ Attempts to load a key from the provided file
-        Arguments:
-            filename -> specifies the key file
+    """ Attempts to load a key from the provided file.
+
+    Args:
+        filename: Specifies the key file.
     """
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
 
 def save_key(key, filename):
-    """ Attempts to save the provided key to the provided file
-        Arguments:
-            key -> the key to be saved
-            filename -> the filename of the saved key
+    """ Attempts to save the provided key to the provided file.
+
+    Args:
+        key: The key to be saved.
+        filename: The filename of the saved key.
     """
     with open(filename, 'wb') as f:
         pickle.dump(key, f)
 
 
 def parse_args(argv):
+    """ Parse command line arguments
+
+    Args:
+        argv: Arguments from the command line.
+    """
     keystore_filename = 'keystore'
     port = 6666
     signing_key = None
     try:
-        opts, _ = getopt.getopt(argv[1:], 'hdp=k=s=', ['help', 'debug', 'port=', 'key=', 'store='])
+        opts, _ = getopt.getopt(argv[1:], 'hdp=k=s=', [
+                                'help', 'debug', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-d/--debug to enable debug prints')
@@ -132,6 +150,13 @@ def parse_args(argv):
 
 
 def init(keystore_filename, port, signing_key):
+    """ Initialize the blockchain client.
+
+    Args:
+        keystore_filename: Filename of the keystore.
+        port: Port used for networking.
+        signing_key: Key of the current user
+    """
     # Create proof-of-work blockchain
     my_blockchain = PoW_Blockchain(send_queue)
     my_blockchain_processor = my_blockchain.process_message()
@@ -167,14 +192,21 @@ def init(keystore_filename, port, signing_key):
     # Initialize Keystore
     keystore = Keystore(keystore_filename)
 
-    return keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread
+    return keystore, signing_key, verify_key_hex, networker, \
+        blockchain_thread, gui_thread
 
 
 def main(argv):
-    """ Main function of the program
-        Provides a CLI for communication with the blockchain node
+    """ Main function of the program.
+
+    Provides a CLI for communication with the blockchain node.
+
+    Args:
+        argv: Arguments from the command line.
     """
-    keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread = init(*parse_args(argv))
+    keystore, signing_key, verify_key_hex, networker, \
+        blockchain_thread, gui_thread = init(
+            *parse_args(argv))
 
     # Initialize CLI
     command_line_interface = cli.CLI()
@@ -210,9 +242,12 @@ def main(argv):
                 dump: print blockchain
                 peers: print peers
                 key <filename> : Save current key to <filename>
-                import <key> <name> : Imports a public key associated with <name> from file <file> to the keystore
-                deletekey <name> : Deletes key associated with <name> from keystore
-                export <filename> : Exports one own public key to file <filename>
+                import <key> <name> : Imports a public key associated with \
+<name> from file <file> to the keystore
+                deletekey <name> : Deletes key associated with <name> from\
+keystore
+                export <filename> : Exports one own public key to file\
+<filename>
                 save: Save blockchain to bc_file.txt
                 exit: exits programm
                 """)
@@ -229,7 +264,8 @@ def main(argv):
             receive_queue.put(('mine', verify_key_hex, 'local'))
         elif re.fullmatch(r'transaction \w+ \d+', command):
             t = command.split(' ')
-            # Create new Transaction, sender = hex(public_key), signature = signed hash of the transaction
+            # Create new Transaction, sender = hex(public_key),
+            # signature = signed hash of the transaction
             if int(t[2]) <= 0:
                 print('Transactions must contain a amount greater than zero!')
                 continue
@@ -239,11 +275,21 @@ def main(argv):
             timestamp = time.time()
             # fee equals 5% of the transaction amount - at least 1
             fee = math.ceil(int(t[2]) * 0.05)
-            transaction_hash = hashlib.sha256((str(verify_key_hex) + str(recipient) + str(t[2])
-                                               + str(fee) + str(timestamp)).encode()).hexdigest()
+            transaction_hash = hashlib.\
+                sha256((str(verify_key_hex) +
+                        str(recipient) + str(t[2])
+                        + str(fee) +
+                        str(timestamp)).encode()).hexdigest()
+
             receive_queue.put(('new_transaction',
-                               Transaction(verify_key_hex, recipient, int(t[2]), fee, timestamp,
-                                           signing_key.sign(transaction_hash.encode())),
+                               Transaction(verify_key_hex,
+                                           recipient,
+                                           int(t[2]),
+                                           fee,
+                                           timestamp,
+                                           signing_key.sign(
+                                               transaction_hash.encode())
+                                           ),
                                'local'
                                ))
         elif command == 'dump':
@@ -278,7 +324,8 @@ def main(argv):
                     keystore.update_key(t[1], '')
                 else:
                     print(
-                        f'Could not delete {t[1]} from keystore. Was it spelt right?')
+                        f'Could not delete {t[1]} from keystore.',
+                        ' Was it spelt right?')
             except Exception as e:
                 print('Could not delete key')
                 print(e)

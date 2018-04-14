@@ -1,4 +1,5 @@
 import pickle
+
 from utils import print_debug_info
 
 
@@ -30,7 +31,9 @@ class Keystore:
     def add_key(self, name, key):
         try:
             if self.store[name]:
-                print_debug_info('Name already exists, use update if you want to change the respective key')
+                print_debug_info(
+                    'Name already exists,' +
+                    'use update if you want to change the respective key')
                 return
         except KeyError:
             self.store[name] = key

@@ -1,25 +1,27 @@
-""" Extended UDP module for the blockchain client
-    Allows for sending and receiving of messages
-    that are bigger than the buffersize
+""" Extended UDP module for the blockchain client.
 
-    Does not handle out-of-order messages
+Allows for sending and receiving of messages
+that are bigger than the buffersize.
+
+Does not handle out-of-order messages.
 """
 
 import socket
 
 
 class ExtendedUDP():
-    """ Implementation of an extended UDP socket
-        Can send/receive messages that are bigger
-        than the buffersize
+    """ Implementation of an extended UDP socket.
 
-        Does not handle out-of-order messages
+    Can send/receive messages that are bigger
+    than the buffersize.
 
-        Call setup() before use and
-        teardown() after use
+    Does not handle out-of-order messages.
 
-        Arguments:
-            buffersize -> Buffersize of the socket (default=1024)
+    Call setup() before use and
+    teardown() after use.
+
+    Args:
+        buffersize: Buffersize of the socket. (default=1024)
     """
 
     def __init__(self, buffersize=1024):
@@ -29,10 +31,10 @@ class ExtendedUDP():
         self.port = 6666
 
     def setup(self, port):
-        """ Setup socket
+        """ Setup socket.
 
-            Arguments:
-                port -> Port of the socket
+        Args:
+            port: Port of the socket.
         """
         if isinstance(self.socket, socket.socket):
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -42,11 +44,11 @@ class ExtendedUDP():
         self.received_data.clear()
 
     def send_msg(self, msg, address):
-        """ Send message to the address
+        """ Send message to the address.
 
-            Arguments:
-                msg -> Message to send (byte-array)
-                address -> Address to send the message to
+        Args:
+            msg: Message to send. (byte-array)
+            address: Address to send the message to.
         """
         if len(msg) < self.buffersize:
             # Simple message
@@ -65,16 +67,16 @@ class ExtendedUDP():
             self.socket.sendto(b'3' + msg[index:], address)
 
     def teardown(self):
-        """ Closes socket
+        """ Closes socket.
         """
         self.socket.close()
 
     def receive_msg(self):
-        """ Try to receive message
+        """ Try to receive message.
 
-            Returns:
-                None if no new message
-                (Message, Address) if new message
+        Returns:
+            None if no new message.
+            (Message, Address) if new message.
         """
         try:
             msg_in, address = self.socket.recvfrom(self.buffersize)

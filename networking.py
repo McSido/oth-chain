@@ -1,6 +1,7 @@
-""" Networking module for the blockchain client,
-    contains all necessary functions to communicate with other clients
-    in the blockchain network, as well as interpret incoming messages
+""" Networking module for the blockchain client.
+
+Contains all necessary functions to communicate with other clients
+in the blockchain network, as well as interpret incoming messages
 """
 
 
@@ -23,11 +24,12 @@ SERVER = ExtendedUDP(1024)
 
 
 def send_msg(msg_type, msg_data, address):
-    """ Send message to address
-    Arguments:
-    msg_type -> Type of the message
-    msg_data -> Data of the message
-    address  -> Address to send message to
+    """ Send message to address.
+
+Args:
+    msg_type: Type of the message
+    msg_data: Data of the message
+    address: Address to send message to
     """
 
     message = pack_msg((msg_type, msg_data))
@@ -36,47 +38,51 @@ def send_msg(msg_type, msg_data, address):
 
 
 def broadcast(msg_type, msg_data):
-    """ Send message to all connected peers
-    Arguments:
-    msg_type -> Type of the message
-    msg_data -> Data of the message
+    """ Send message to all connected peers.
+
+    Args:
+        msg_type: Type of the message.
+        msg_data: Data of the message.
     """
     for peer in PEERS.get_broadcast_peers():
         send_msg(msg_type, msg_data, peer)
 
 
 def unpack_msg(msg):
-    """ Deserialize a message
-    Arguments:
-    msg -> Message to unpack
+    """ Deserialize a message.
+
+    Args:
+        msg: Message to unpack.
     """
     return pickle.loads(msg)
 
 
 def pack_msg(msg):
-    """ Serialize a message
-    Arguments:
-    msg -> Message to serialize
+    """ Serialize a message.
+
+    Args:
+        msg: Message to serialize
     """
     return pickle.dumps(msg)
 
 
 def process_incoming_msg(msg, in_address, receive_queue):
     """ Process messages received from other nodes
-    Arguments:
-    msg -> Received message
-    in_address -> Address of the sender
-    receive_queue -> Queue for communication with the blockchain
+
+    Args:
+        msg: Received message
+        in_address: Address of the sender
+        receive_queue: Queue for communication with the blockchain
     """
     try:
         msg_type, msg_data = unpack_msg(msg)
     except ValueError as err:
-        print_debug_info(f'### DEBUG ### Received invalid message\n {err}')
+        print_debug_info(f'Received invalid message\n {err}')
         return
 
     PEERS.peer_seen(in_address)
 
-    print_debug_info('### DEBUG ### received: ' + msg_type)
+    print_debug_info('received: ' + msg_type)
     if msg_type.startswith('N_'):
         # networking messages
         if msg_type == 'N_new_peer':
@@ -94,19 +100,21 @@ def process_incoming_msg(msg, in_address, receive_queue):
 
 
 def get_peers(address):
-    """ Send all known peers
-    Arguments:
-    address -> Address to send peers to
+    """ Send all known peers.
+
+    Args:
+        address: Address to send peers to.
     """
     for peer in PEERS.get_all_peers():
         send_msg('N_new_peer', peer, address)
 
 
 def example_worker(send_queue, receive_queue, command_queue):
-    """ Simple example of a networker
-    Arguments:
-    send_queue -> Queue for messages to other nodes
-    receive_queue -> Queue for messages to the attached blockchain
+    """ Simple example of a networker.
+
+    Args:
+        send_queue: Queue for messages to other nodes.
+        receive_queue: Queue for messages to the attached blockchain.
     """
 
     # Main loop
@@ -143,12 +151,13 @@ def example_worker(send_queue, receive_queue, command_queue):
 
 
 def worker(send_queue, receive_queue, command_queue, port=6666):
-    """ Takes care of the communication between nodes
-    Arguments:
-    send_queue -> Queue for messages to other nodes
-    receive_queue -> Queue for messages to the attached blockchain
+    """ Takes care of the communication between nodes.
+
+    Args:
+        send_queue: Queue for messages to other nodes.
+        receive_queue: Queue for messages to the attached blockchain.
     """
-    print_debug_info("### DEBUG ### Started networking")
+    print_debug_info("Started networking")
     # Example:
     # Find peers
     # Main loop:
