@@ -7,6 +7,9 @@ Does not handle out-of-order messages.
 """
 
 import socket
+from typing import Dict, Tuple, Optional
+
+Address = Tuple[str, int]
 
 
 class ExtendedUDP():
@@ -24,13 +27,13 @@ class ExtendedUDP():
         buffersize: Buffersize of the socket. (default=1024)
     """
 
-    def __init__(self, buffersize=1024):
+    def __init__(self, buffersize: int = 1024) -> None:
         self.buffersize = buffersize
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.received_data = {}
+        self.received_data: Dict[Tuple[str, int], Tuple[bool, bytes]] = {}
         self.port = 6666
 
-    def setup(self, port):
+    def setup(self, port: int):
         """ Setup socket.
 
         Args:
@@ -43,11 +46,11 @@ class ExtendedUDP():
         self.port = port
         self.received_data.clear()
 
-    def send_msg(self, msg, address):
+    def send_msg(self, msg: bytes, address: Address):
         """ Send message to the address.
 
         Args:
-            msg: Message to send. (byte-array)
+            msg: Message to send.
             address: Address to send the message to.
         """
         if len(msg) < self.buffersize:
@@ -71,7 +74,7 @@ class ExtendedUDP():
         """
         self.socket.close()
 
-    def receive_msg(self):
+    def receive_msg(self) -> Optional[Tuple[bytes, Address]]:
         """ Try to receive message.
 
         Returns:

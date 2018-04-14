@@ -12,12 +12,16 @@ import math
 import pickle
 import re
 import time
+from typing import Any
+
 import nacl.encoding
 import nacl.signing
 import nacl.utils
 
 import cli
 import networking
+from networking import Address
+from blockchain import Blockchain
 from GUI import *
 from keystore import Keystore
 from pow_chain import PoW_Blockchain, Transaction
@@ -28,19 +32,20 @@ from utils import print_debug_info, set_debug
 #  nodes
 # Every message on the receive_queue should be worked on by the
 #  blockchain
-send_queue = Queue()
-receive_queue = Queue()
-networker_command_queue = Queue()
+send_queue: Queue = Queue()
+receive_queue: Queue = Queue()
+networker_command_queue: Queue = Queue()
 # queue for exchanging values between gui
-gui_send_queue = Queue()
-gui_receive_queue = Queue()
+gui_send_queue: Queue = Queue()
+gui_receive_queue: Queue = Queue()
 
 
 # keystore = dict()
 # keystore_filename = 'keystore'
 
 
-def receive_msg(msg_type, msg_data, msg_address, blockchain, processor):
+def receive_msg(msg_type: str, msg_data: Any, msg_address: Address,
+                blockchain: Blockchain, processor):
     """ Call blockchain functionality for received messages.
 
     Args:
@@ -62,7 +67,7 @@ def receive_msg(msg_type, msg_data, msg_address, blockchain, processor):
         processor(msg_type, msg_data, msg_address)
 
 
-def blockchain_loop(blockchain, processor):
+def blockchain_loop(blockchain: Blockchain, processor):
     """ The main loop of the blockchain thread.
 
     Receives messages and processes them.
@@ -149,7 +154,7 @@ def parse_args(argv):
     return keystore_filename, port, signing_key
 
 
-def init(keystore_filename, port, signing_key):
+def init(keystore_filename: str, port: int, signing_key):
     """ Initialize the blockchain client.
 
     Args:

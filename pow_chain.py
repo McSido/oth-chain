@@ -5,12 +5,14 @@ import hashlib
 import math
 import time
 from pprint import pprint
+from typing import Any, Callable, Dict, List
 
 import nacl.encoding
 import nacl.signing
 from nacl.exceptions import BadSignatureError
 
 from blockchain import Block, Blockchain, Transaction
+from networking import Address
 from utils import print_debug_info
 
 
@@ -21,10 +23,7 @@ class PoW_Blockchain(Blockchain):
         send_queue: Queue for messages to other nodes.
     """
 
-    def __init__(self, send_queue):
-        super().__init__(send_queue)
-
-    def new_block(self, block):
+    def new_block(self, block: Block):
         """ Adds a provided block to the chain after checking it for validity.
 
         Args:
@@ -48,7 +47,7 @@ class PoW_Blockchain(Blockchain):
         else:
             print_debug_info('Invalid block')
 
-    def validate_block(self, block, last_block):
+    def validate_block(self, block: Block, last_block: Block) -> bool:
         """ Validates a provided block.
 
         Takes the previous block in the chain into account
@@ -93,7 +92,9 @@ class PoW_Blockchain(Blockchain):
                 return False
         return True
 
-    def validate_transaction(self, transaction, mining=False):
+    def validate_transaction(self,
+                             transaction: Transaction,
+                             mining: bool = False) -> bool:
         """ Validates a single transaction.
 
         Validates the signature, the signed hash of the signature
@@ -151,7 +152,7 @@ class PoW_Blockchain(Blockchain):
             print_debug_info('Bad Signature, Validation Failed')
             return False
 
-    def create_proof(self, miner_key):
+    def create_proof(self, miner_key: bytes) -> int:
         """ Create proof of work.
 
         Find a number that fullfills validate_proof().
@@ -169,7 +170,8 @@ class PoW_Blockchain(Blockchain):
             proof += 1
         return proof
 
-    def validate_proof(self, last_block, proof, miner_key):
+    def validate_proof(self, last_block: Block,
+                       proof: int, miner_key: bytes) -> bool:
         """ Check if a proof is valid.
 
         A proof is valid if the hash of the combination of it combined
@@ -189,7 +191,7 @@ class PoW_Blockchain(Blockchain):
         test_hash = self.hash(test_proof)
         return test_hash[:difficulty] == '0' * difficulty
 
-    def resolve_conflict(self, new_chain):
+    def resolve_conflict(self, new_chain: List[Block]):
         """ Resolves any conflicts that occur with different/outdated chains.
 
         Conflicts are resolved by accepting the longest valid chain.
@@ -222,7 +224,7 @@ class PoW_Blockchain(Blockchain):
             print_debug_info('Conflict resolved (old chain)')
 
     @staticmethod
-    def scale_difficulty(last_block):
+    def scale_difficulty(last_block: Block) -> int:
         """ Example implementation of a scaling difficulty curve.
 
         Difficulty rises fast in the beginning and slower towards later blocks,
@@ -241,23 +243,23 @@ class PoW_Blockchain(Blockchain):
             difficulty = 1
         return difficulty
 
-    def process_message(self):
+    def process_message(self) -> Callable[[str, Any, Address], Any]:
         """ Create processor for incoming blockchain messages.
 
         Returns:
             Processor (function) that processes blockchain messages.
         """
 
-        def new_block_inner(msg_data, _):
+        def new_block_inner(msg_data: Any, _: Address):
             assert isinstance(msg_data, Block)
             self.new_block(msg_data)
 
-        def new_transaction_inner(msg_data, _):
+        def new_transaction_inner(msg_data: Any, _: Address):
             assert isinstance(msg_data, Transaction)
             if msg_data.sender != '0':
                 self.new_transaction(msg_data)
 
-        def mine(msg_data, msg_address):
+        def mine(msg_data: Any, msg_address: Address):
             if msg_address != 'local':
                 return
             proof = self.create_proof(msg_data)
@@ -274,27 +276,27 @@ class PoW_Blockchain(Blockchain):
                             timestamp=time.time(), signature='0'))
             self.new_block(block)
 
-        def resolve_conflict_inner(msg_data, _):
+        def resolve_conflict_inner(msg_data: Any, _: Address):
             assert isinstance(msg_data, list)
             assert all(isinstance(block, Block) for block in msg_data)
             self.resolve_conflict(msg_data)
 
-        def print_balance(msg_data, _):
+        def print_balance(msg_data: Any, _: Address):
             print(
                 'Current Balance: ' +
                 f'{self.check_balance(msg_data[0], msg_data[1])}')
 
-        def save_chain(_, msg_address):
+        def save_chain(_: Any, msg_address: Address):
             if msg_address != 'local':
                 return
             self.save_chain()
 
-        def dump_vars(_, msg_address):
+        def dump_vars(_: Any, msg_address: Address):
             if msg_address != 'local':
                 return
             pprint(vars(self))
 
-        commands = {
+        commands: Dict[str, Callable[[Any, Address], Any]] = {
             'new_block': new_block_inner,
             'new_transaction': new_transaction_inner,
             'mine': mine,
@@ -304,13 +306,14 @@ class PoW_Blockchain(Blockchain):
             'dump': dump_vars,
         }
 
-        def processor(msg_type, msg_data, msg_address):
+        def processor(msg_type: str, msg_data: Any,
+                      msg_address: Address) -> Any:
             commands[msg_type](msg_data, msg_address)
 
         return processor
 
     @property
-    def difficulty(self):
+    def difficulty(self) -> int:
         """ Get current difficulty of the blockchain.
 
         Returns:

@@ -6,7 +6,9 @@ import pickle
 from collections import namedtuple
 from pathlib import Path
 from pprint import pprint
+from queue import Queue
 from time import time
+from typing import Any, Callable, List
 
 from utils import print_debug_info
 
@@ -25,13 +27,13 @@ class Blockchain(object):
         send_queue: Queue for messages to other nodes
     """
 
-    def __init__(self, send_queue):
-        self.chain = []
-        self.transaction_pool = []
+    def __init__(self, send_queue: Queue) -> None:
+        self.chain: List[Block] = []
+        self.transaction_pool: List[Transaction] = []
         self.send_queue = send_queue
         self.load_chain()
 
-    def check_balance(self, key, timestamp):
+    def check_balance(self, key: bytes, timestamp: float) -> int:
         """ Checks the amount of coins a certain user (identified by key) has.
 
             Calculates balance by iterating through the chain and checking the
@@ -82,7 +84,7 @@ class Blockchain(object):
             pickle.dump(self.chain, output,
                         pickle.HIGHEST_PROTOCOL)
 
-    def new_transaction(self, transaction):
+    def new_transaction(self, transaction: Transaction):
         """ Add a new transaction to the blockchain.
 
         Args:
@@ -103,7 +105,7 @@ class Blockchain(object):
         else:
             print_debug_info('Invalid transaction')
 
-    def new_block(self, block):
+    def new_block(self, block: Block):
         """ Add a new block to the blockchain.
 
         Args:
@@ -112,9 +114,9 @@ class Blockchain(object):
         if block.index > self.latest_block().index + 1:
             # block higher then current chain:
             # resolve conflict between chains
-            self.send_queue(('resolve_conflict', self.chain, 'broadcast'))
+            self.send_queue.put(('resolve_conflict', self.chain, 'broadcast'))
 
-        if self.validate_block(block, self.chain[:-1]):
+        if self.validate_block(block, self.chain[-1]):
             for block_transaction in block.transactions:
                 if block_transaction in self.transaction_pool:
                     self.transaction_pool.remove(block_transaction)
@@ -123,7 +125,7 @@ class Blockchain(object):
         else:
             print_debug_info('Invalid block')
 
-    def validate_block(self, block, last_block):
+    def validate_block(self, block: Block, last_block: Block) -> bool:
         """ Validate a block.
 
         Abstract function!
@@ -134,7 +136,7 @@ class Blockchain(object):
         """
         raise NotImplementedError
 
-    def validate_transaction(self, transaction):
+    def validate_transaction(self, transaction: Transaction):
         """ Validate a transaction.
 
         Abstract function!
@@ -144,7 +146,7 @@ class Blockchain(object):
         """
         raise NotImplementedError
 
-    def create_block(self, proof):
+    def create_block(self, proof: Any) -> Block:
         """ Create a new block.
 
         Args:
@@ -161,7 +163,7 @@ class Blockchain(object):
                       )
         return block
 
-    def create_proof(self, miner_key):
+    def create_proof(self, miner_key: bytes) -> Any:
         """ Create a proof for a new block.
 
         Abstract function!
@@ -174,7 +176,7 @@ class Blockchain(object):
         """
         raise NotImplementedError
 
-    def resolve_conflict(self, new_chain):
+    def resolve_conflict(self, new_chain: List[Block]):
         """ Resolve conflict between to blockchains/forks.
 
         Abstract function!
@@ -184,12 +186,12 @@ class Blockchain(object):
         """
         raise NotImplementedError
 
-    def process_message(self):
+    def process_message(self) -> Callable:
         """ Currently does nothing
         """
         raise NotImplementedError
 
-    def latest_block(self):
+    def latest_block(self) -> Block:
         """ Get the latest block.
 
         Returns:
@@ -198,7 +200,7 @@ class Blockchain(object):
         return self.chain[-1]
 
     @staticmethod
-    def hash(data):
+    def hash(data: Any) -> str:
         """ Create a sha256 hash of the argument.
 
         Args:

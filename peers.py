@@ -4,6 +4,10 @@ import ipaddress
 import os
 import socket
 import time
+from typing import Tuple, Set
+from queue import Queue
+
+Address = Tuple[str, int]
 
 
 class PeerManager():
@@ -19,7 +23,7 @@ class PeerManager():
         self._self_addresses = set()
         self._send_queue = None
 
-    def setup(self, send_queue, port):
+    def setup(self, send_queue: Queue, port: int):
         """ Setup PeerManager.
 
         Loads initial peers from peers.cfg, creates the file if needed.
@@ -31,7 +35,7 @@ class PeerManager():
         self._send_queue = send_queue
         self._init_peers(port)
 
-    def _init_peers(self, port):
+    def _init_peers(self, port: int):
         """ Initialize peers.
 
         Arguments:
@@ -87,7 +91,7 @@ class PeerManager():
         for addr in to_remove:
             self._active_peers.discard(addr)
 
-    def get_broadcast_peers(self):
+    def get_broadcast_peers(self) -> Set[Address]:
         """ Get the peers that sould receive broadcast messages.
 
         Returns:
@@ -99,7 +103,7 @@ class PeerManager():
             return self._peer_list
         return self._active_peers
 
-    def peer_inferred(self, address):
+    def peer_inferred(self, address: Address):
         """ Add new inferred peer
 
         Infer peers by e.g. receiving 'N_new_peer' messages.
@@ -115,7 +119,7 @@ class PeerManager():
             self._peer_list.add(address)
             self._send_queue.put(('N_ping', '', address))
 
-    def peer_seen(self, address):
+    def peer_seen(self, address: Address):
         """ Add new seen/active peer
 
         Seen/Active peer is a peer that directly messaged this node.
@@ -135,7 +139,7 @@ class PeerManager():
 
         self._last_seen[address] = time.time()
 
-    def get_all_peers(self):
+    def get_all_peers(self) -> Set[Address]:
         """ Get all peers.
 
         For information only!
@@ -146,7 +150,7 @@ class PeerManager():
         """
         return self._peer_list
 
-    def get_active_peers(self):
+    def get_active_peers(self) -> Set[Address]:
         """ Get active peers.
 
         For information only!

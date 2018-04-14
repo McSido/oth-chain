@@ -9,7 +9,8 @@ import pickle  # change for secure solution
 import sys
 import time
 from pprint import pprint
-from queue import Empty
+from queue import Empty, Queue
+from typing import Any, Tuple
 
 from ext_udp import ExtendedUDP
 from peers import PeerManager
@@ -17,13 +18,14 @@ from utils import print_debug_info
 
 # (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
 
+Address = Tuple[str, int]
 
 # Initialize
 PEERS = PeerManager()
 SERVER = ExtendedUDP(1024)
 
 
-def send_msg(msg_type, msg_data, address):
+def send_msg(msg_type: str, msg_data: Any, address: Address):
     """ Send message to address.
 
 Args:
@@ -37,7 +39,7 @@ Args:
     SERVER.send_msg(message, address)
 
 
-def broadcast(msg_type, msg_data):
+def broadcast(msg_type: str, msg_data: Any):
     """ Send message to all connected peers.
 
     Args:
@@ -48,25 +50,32 @@ def broadcast(msg_type, msg_data):
         send_msg(msg_type, msg_data, peer)
 
 
-def unpack_msg(msg):
+def unpack_msg(msg: bytes) -> Tuple[str, Any]:
     """ Deserialize a message.
 
     Args:
         msg: Message to unpack.
+
+    Returns:
+        Unpacked message.
     """
     return pickle.loads(msg)
 
 
-def pack_msg(msg):
+def pack_msg(msg: Tuple[str, Any]) -> bytes:
     """ Serialize a message.
 
     Args:
         msg: Message to serialize
+
+    Returns:
+        Packed message.
     """
     return pickle.dumps(msg)
 
 
-def process_incoming_msg(msg, in_address, receive_queue):
+def process_incoming_msg(msg: bytes, in_address: Address,
+                         receive_queue: Queue):
     """ Process messages received from other nodes
 
     Args:
@@ -99,7 +108,7 @@ def process_incoming_msg(msg, in_address, receive_queue):
         receive_queue.put((msg_type, msg_data, in_address))
 
 
-def get_peers(address):
+def get_peers(address: Address):
     """ Send all known peers.
 
     Args:
@@ -109,7 +118,9 @@ def get_peers(address):
         send_msg('N_new_peer', peer, address)
 
 
-def example_worker(send_queue, receive_queue, command_queue):
+def example_worker(send_queue: Queue,
+                   receive_queue: Queue,
+                   command_queue: Queue):
     """ Simple example of a networker.
 
     Args:
@@ -150,7 +161,10 @@ def example_worker(send_queue, receive_queue, command_queue):
         # (https://stackoverflow.com/questions/29082268/python-time-sleep-vs-event-wait)
 
 
-def worker(send_queue, receive_queue, command_queue, port=6666):
+def worker(send_queue: Queue,
+           receive_queue: Queue,
+           command_queue: Queue,
+           port: int = 6666):
     """ Takes care of the communication between nodes.
 
     Args:
