@@ -1,5 +1,5 @@
 """ Testing module for the Proof-Of-Work implementation
-    of the blockchain client.
+of the blockchain client.
 """
 
 import hashlib
@@ -15,23 +15,23 @@ import pow_chain
 
 class TestPOW():
     """ Testcase used to bundle all tests for the
-        Proof-Of-Work blockchain
+    Proof-Of-Work blockchain
     """
 
     def setup(self):
-        """ Setup of the blockchain for the tests
+        """ Setup of the blockchain for the tests.
         """
         self.sends = Queue()
         self.blockchain = pow_chain.PoW_Blockchain(self.sends)
-        self.sender_sign = nacl.signing.SigningKey(seed=b'a'*32)
+        self.sender_sign = nacl.signing.SigningKey(seed=b'a' * 32)
         self.sender_verify = self.sender_sign.verify_key.encode(
             nacl.encoding.HexEncoder)
-        self.receiver_sign = nacl.signing.SigningKey(seed=b'b'*32)
+        self.receiver_sign = nacl.signing.SigningKey(seed=b'b' * 32)
         self.receiver_verify = self.receiver_sign.verify_key.encode(
             nacl.encoding.HexEncoder)
 
     def test_block(self):
-        """ Test that the block creation works as intended
+        """ Test that the block creation works as intended.
         """
         proof = self.blockchain.create_proof(self.sender_verify)
         block = self.blockchain.create_block(proof)
@@ -55,7 +55,7 @@ class TestPOW():
 
     def test_transaction_invalid_balance(self):
         """ Test that the transactions with invalid balances are recognized and
-            not added to the blockchain
+        not added to the blockchain.
         """
         transaction = self.create_transaction()
 
@@ -68,7 +68,7 @@ class TestPOW():
 
     def test_transaction_invalid_signature(self):
         """ Test that the transactions with invalid signatures are recognized
-            and not added to the blockchain
+        and not added to the blockchain.
         """
         self.mine_block()
 
@@ -96,7 +96,7 @@ class TestPOW():
         assert self.sends.empty()
 
     def test_transaction_invalid_double(self):
-        """ Test that the same transaction is not added twice to the blockchain
+        """ Test that the same transaction is not added twice to the blockchain.
         """
         self.mine_block()
 
@@ -113,7 +113,7 @@ class TestPOW():
 
     def test_transaction_valid(self):
         """ Test that a valid transaction is recognized and added to the
-            blockchain
+        blockchain.
         """
         self.mine_block()
 
@@ -127,7 +127,7 @@ class TestPOW():
         assert not self.sends.empty()
 
     def mine_block(self):
-        """ Mine an initial block to add a balance to the test account
+        """ Mine an initial block to add a balance to the test account.
         """
 
         proof = self.blockchain.create_proof(self.sender_verify)
@@ -143,7 +143,10 @@ class TestPOW():
         self.sends.get(timeout=1)  # Remove new_block message
 
     def create_transaction(self):
-        """ Create simple transaction used in tests
+        """ Create simple transaction used in tests.
+
+        Returns:
+            A new transaction.
         """
 
         amount = 10
@@ -162,7 +165,15 @@ class TestPOW():
         )
 
     def create_transaction_hash(self, amount, fee, timestamp):
-        """ Creates the transaction-hash used in tests
+        """ Creates the transaction-hash used in tests.
+
+        Args:
+            amount: Amount of coins for transaction.
+            fee: Fee for the transaction.
+            timestamp: Time of the transaction.
+
+        Returns:
+            Hash for the given transaction data
         """
         return hashlib.sha256(
             (str(self.sender_verify) + str(self.receiver_verify) +

@@ -1,5 +1,4 @@
-""" Testing module for the core module
-    of the blockchain client.
+""" Testing module for the core module of the blockchain client.
 """
 
 import time
@@ -10,11 +9,12 @@ import test_pow_chain
 
 class TestCore():
     """ Testcase used to bundle all tests for the
-        Core module of the blockchain client
+    Core module of the blockchain client.
+
     """
 
     def setup(self):
-        """ Setup for the tests
+        """ Setup for the tests.
         """
         self.test_obj = test_pow_chain.TestPOW()
         self.test_obj.setup()
@@ -24,8 +24,7 @@ class TestCore():
         self.address = ('0.0.0.0', '2323')
 
     def test_new_block(self):
-        """ Test receive message functionality for new_block
-            of the core module
+        """ Test receive message functionality for new_block.
         """
 
         block = self.chain.create_block(
@@ -45,16 +44,14 @@ class TestCore():
         assert send_msg[2] == 'broadcast'
 
     def test_new_transaction(self):
-        """ Test receive message functionality for new_transaction
-            of the core module
+        """ Test receive message functionality for new_transaction.
 
             ! Not implemented yet !
         """
         pass
 
     def test_mine(self):
-        """ Test receive message functionality for mine
-            of the core module
+        """ Test receive message functionality for mine.
         """
         core.receive_msg(
             'mine',
@@ -72,8 +69,7 @@ class TestCore():
             self.test_obj.sender_verify, time.time) > 0
 
     def test_get_newest_block(self):
-        """ Test receive message functionality for get_newest_block
-            of the core module
+        """ Test receive message functionality for get_newest_block.
         """
         core.receive_msg(
             'get_newest_block',
@@ -89,8 +85,8 @@ class TestCore():
         assert send_msg[2] == self.address
 
     def test_get_chain_resolve_conflict(self):
-        """ Test receive message functionality for get_chain
-            and resolve_conflict of the core module
+        """ Test receive message functionality for get_chain.
+        and resolve_conflict
         """
         # get_chain
         core.receive_msg(
@@ -118,8 +114,7 @@ class TestCore():
         assert self.chain.chain == copied_chain
 
     def test_print_balance(self, capsys):
-        """ Test receive message functionality for print_balance
-            of the core module
+        """ Test receive message functionality for print_balance.
         """
         curr_time = time.time
         core.receive_msg(
@@ -131,14 +126,16 @@ class TestCore():
         )
 
         captured = capsys.readouterr()
+        balance = self.chain.check_balance(
+            self.test_obj.sender_verify, curr_time)
+
         assert captured.out.strip() ==\
-            f'Current Balance: ' + \
-            f'{self.chain.check_balance(self.test_obj.sender_verify, curr_time)}'.strip()
+            f'Current Balance: ' + f'{balance}'.strip()
 
     def test_commands(self):
-        """ Test the command input of the core module
+        """ Test the command input of the core module.
 
-            Currently unimplemented because commands
-            are read in main()
+        Currently unimplemented because commands
+        are read in main().
         """
         pass
