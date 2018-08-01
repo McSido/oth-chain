@@ -178,10 +178,7 @@ def init(keystore_filename: str, port: int, signing_key):
         args=(my_blockchain, my_blockchain_processor))
     blockchain_thread.start()
 
-    # gui thread
-    gui_thread = threading.Thread(
-        target=gui_loop,
-        args=(gui_send_queue, gui_receive_queue), )  # daemon=True
+
 
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
@@ -196,6 +193,11 @@ def init(keystore_filename: str, port: int, signing_key):
 
     # Initialize Keystore
     keystore = Keystore(keystore_filename)
+
+    # gui thread
+    gui_thread = threading.Thread(
+        target=gui_loop,
+        args=(gui_send_queue, gui_receive_queue, keystore), )  # daemon=True
 
     return keystore, signing_key, verify_key_hex, networker, \
         blockchain_thread, gui_thread
@@ -212,9 +214,6 @@ def main(argv):
     keystore, signing_key, verify_key_hex, networker, \
         blockchain_thread, gui_thread = init(
             *parse_args(argv))
-
-    # Initialize CLI
-    command_line_interface = cli.CLI()
 
     # User Interaction
     while True:

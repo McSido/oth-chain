@@ -8,215 +8,113 @@ from queue import Queue
 
 lineQueue = Queue()
 
-def gui_loop(gui_send_queue, gui_receive_queue):
-    app = QApplication(sys.argv)
-    ex = ChainGUI()
-    lineEdit = QLineEdit()
-    textBrowser = QTextBrowser()
-    textBrowser.setStyleSheet("background-color: black")
-    ex.initUI(lineEdit, textBrowser, gui_receive_queue)
-    read_thread = threading.Thread(
-        target=read_from_queue,
-        args=(gui_send_queue, textBrowser,), daemon=True)
-    read_thread.start()
 
-    lineEditThread = threading.Thread(
-        target=writeToLineEdit,
-        args=(lineQueue, lineEdit), daemon=True)
-    lineEditThread.start()
+def gui_loop(gui_send_queue, gui_receive_queue, keystore):
+    app = QApplication(sys.argv)
+    ex = ChainGUI(keystore)
+    ex.initUI(gui_receive_queue)
 
     sys.exit(app.exec_())
 
-def writeToLineEdit(lineQueue, line):
-    while True:
-        if (not lineQueue.empty()):
-            line.setText(str(lineQueue.get()))
 
+class ChainGUI(QMainWindow):
 
-def read_from_queue(send_queue, textBrowser):
-    while True:
-        if not send_queue.empty():
-            cmd = send_queue.get(block=False)
-            if(' ' in str(cmd)) == False:
-                cmd_html = "<body><div style='color:yellow;'>"
-                cmd_html += (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ' : ' + str(cmd))
-                cmd_html += "</div'></body>"
-                textBrowser.append(cmd_html)
-            else:
-                cmd_str = str(cmd)
-                for ch in ["Block"]:
-                    if ch in cmd_str:
-                        cmd_str = cmd_str.replace(ch, "<br>" + ch)
-                for ch in ['\n']:
-                    if ch in cmd_str:
-                        cmd_str = cmd_str.replace(ch, "<br>")
-
-                cmd_html = "<body><div style='color:white;'>"
-                cmd_html += str(cmd_str)
-                cmd_html += "</div'></body>"
-                textBrowser.append(str(cmd_html) + '\n')
-
-            textBrowser.moveCursor(QtGui.QTextCursor.End)
-            textBrowser.ensureCursorVisible()
-            if(cmd == None or cmd == 'exit'):
-                return
-
-
-class ChainGUI(QWidget):
-    lineEditHistory = list()
-    lineHistoryCounter = len(lineEditHistory)
-
-    def __init__(self):
+    def __init__(self, keystore):
         super(ChainGUI, self).__init__()
+        self.lineEditHistory = list()
+        self.lineHistoryCounter = len(self.lineEditHistory)
+        self.keystore = keystore
 
-    def initUI(self, lineEdit, textBrowser, receive_queue):
+    def initUI(self, receive_queue):
 
-        #lineEdit = QLineEdit()
-        # Buttons
-        transactionButton = QPushButton("&Transaction", self)
-        transactionButton.clicked.connect(partial(self.slot_transaction, receive_queue))
-        mineButton = QPushButton("&Mine", self)
-        mineButton.clicked.connect(partial(self.slot_mine, receive_queue))
-        dumpButton = QPushButton("&Dump", self)
-        dumpButton.clicked.connect(partial(self.slot_dump, receive_queue))
-        peersButton = QPushButton("&Peers", self)
-        peersButton.clicked.connect(partial(self.slot_peers, receive_queue))
-        saveKeyButton = QPushButton("&key <filename>", self)
-        saveKeyButton.clicked.connect(partial(self.slot_saveKey, receive_queue))
-        saveButton = QPushButton("&Save", self)
-        saveButton.clicked.connect(partial(self.slot_save, receive_queue))
-        importButton = QPushButton("&Import Key", self)
-        importButton.clicked.connect(partial(self.slot_importKey, receive_queue))
-        exportButton = QPushButton("E&xport", self)
-        exportButton.clicked.connect(partial(self.slot_exportKey, receive_queue))
-
-        helpButton = QPushButton('&Help', self)
-        helpButton.clicked.connect(partial(self.slot_help, receive_queue))
-        exitButton = QPushButton("&Exit", self)
-        exitButton.clicked.connect(partial(self.slot_exit, receive_queue))
-        # Keys
-        lineEdit.returnPressed.connect(partial(self.slot_lineEdit, receive_queue, lineEdit))
-
-        grid = QGridLayout()
-        grid.setSpacing(5)
-
-        grid.addWidget(textBrowser, 0, 0, 1, 10)
-        grid.addWidget(lineEdit, 2, 0, 2, 10)
-
-        grid.addWidget(transactionButton, 10, 0)
-        grid.addWidget(mineButton, 10, 1)
-        grid.addWidget(dumpButton, 10, 2)
-        grid.addWidget(peersButton, 10, 3)
-        grid.addWidget(saveKeyButton, 10, 4)
-        grid.addWidget(saveButton, 10, 5)
-        grid.addWidget(importButton, 10, 6)
-        grid.addWidget(exportButton, 10, 7)
-        grid.addWidget(helpButton, 10, 8)
-        grid.addWidget(exitButton, 10, 9)
-
-        self.setLayout(grid)
-        self.setGeometry(350, 350, 650, 600)
-        self.setWindowTitle('OTH-Chain')
-        lineEdit.setFocus()
+        self.splitter = QSplitter()
+        self.splitter.addWidget(TabWidget(self))
+        self.splitter.addWidget(TransactionWidget(self))
+        self.setCentralWidget(self.splitter)
         self.show()
 
-    # Slots
-    def slot_importKey(self, receive_queue):
-        #TODO add dialog
-        #self.lineHistoryCounter = len(self.lineEditHistory)
-        print("import")
 
-    def slot_exportKey(self, receive_queue):
-        #TODO add dialog
-        print("export")
+class TabWidget(QWidget):
+
+    def __init__(self, parent):
+        super(TabWidget, self).__init__(parent)
+        self.layout = QVBoxLayout(self)
+
+        self.tabs = QTabWidget()
+        self.chain_tab = QWidget()
+        self.peers_tab = QWidget()
+        self.keystore_tab = QWidget()
+
+        self.keystore_tab_layout = QVBoxLayout()
+        self.keystore_tab_key_group = QGroupBox()
+        self.keystore_tab_key_group_layout = QVBoxLayout()
+        # TODO: Make dedicated classes for the tabs
+        for key, value in self.parent().keystore.store.items():
+            delete_button = QPushButton('Delete')
+            hbox = QHBoxLayout()
+            hbox.addWidget(QLabel(key))
+            hbox.addWidget(QLabel(str(value)))
+            hbox.addWidget(delete_button)
+            self.keystore_tab_key_group_layout.addLayout(hbox)
+        self.keystore_tab_key_group.setLayout(self.keystore_tab_key_group_layout)
+        self.keystore_tab_layout.addWidget(self.keystore_tab_key_group)
+        self.keystore_tab.setLayout(self.keystore_tab_layout)
 
 
-    def slot_help(self, receive_queue):
-        self.lineEditHistory.append("help")
-        receive_queue.put("help")
+        self.tabs.addTab(self.chain_tab, 'Chain history')
+        self.tabs.addTab(self.peers_tab, 'Peers')
+        self.tabs.addTab(self.keystore_tab, 'Keystore')
 
-    def slot_transaction(self, receive_queue):
-        d = QDialog()
-        d.setWindowTitle("Transaction Details")
-        line1 = QLineEdit(d)
-        line1.setPlaceholderText("to")
-        line2 = QLineEdit(d)
-        line2.setPlaceholderText("Amount")
-        cancelButton = QPushButton("&Cancel", d)
-        okButton = QPushButton("&Ok", d)
-        line1.move(100, 50)
-        line2.move(100,100)
-        okButton.move(50, 150)
-        cancelButton.move(150, 150)
-        okButton.clicked.connect(partial(self.slot_sendTransactionData, receive_queue, line1, line2))
-        okButton.clicked.connect(d.close)
-        cancelButton.clicked.connect(d.close)
-        d.exec()
+        self.layout.addWidget(self.tabs)
+        self.setLayout(self.layout)
 
-    def slot_mine(self, receive_queue):
-        self.lineEditHistory.append("mine")
-        self.lineHistoryCounter = len(self.lineEditHistory)
-        receive_queue.put("mine")
 
-    def slot_dump(self, receive_queue):
-        self.lineEditHistory.append("dump")
-        self.lineHistoryCounter = len(self.lineEditHistory)
-        receive_queue.put('dump')
+class TransactionWidget(QWidget):
 
-    def slot_peers(self, receive_queue):
-        self.lineEditHistory.append("peers")
-        self.lineHistoryCounter = len(self.lineEditHistory)
-        receive_queue.put("peers")
+    def __init__(self, parent):
+        super(TransactionWidget, self).__init__(parent)
+        self.layout = QVBoxLayout(self)
 
-    def slot_saveKey(self, receive_queue):
-        #fileName = QFileDialog.getOpenFileName(self, 'Open File')
-        d = QDialog()
-        d.setWindowTitle("Enter filename without extensions")
-        line = QLineEdit(d)
-        line.setPlaceholderText("filename for key")
-        cancelButton = QPushButton("&Cancel", d)
-        okButton = QPushButton("&Ok", d)
-        line.move(20, 50)
-        okButton.move(20, 100)
-        cancelButton.move(100, 100)
-        okButton.clicked.connect(d.close)
-        cancelButton.clicked.connect(d.close)
-        d.exec()
-        receive_queue.put("key " + str(line.text()))
-        self.lineEditHistory.append("key " + str(line.text()))
-        self.lineHistoryCounter = len(self.lineEditHistory)
+        self.user_group_box = QGroupBox()
 
-    def slot_save(self, receive_queue):
-        self.lineEditHistory.append('save')
-        self.lineHistoryCounter = len(self.lineEditHistory)
-        receive_queue.put("save")
+        self.user_group_box_layout = QVBoxLayout()
+        self.user_group_box_form = QFormLayout()
 
-    def slot_exit(self, receive_queue):
-        receive_queue.put('exit')
-        self.close()
+        self.load_key_button = QPushButton('Load private Key')
+        self.export_key_button = QPushButton('Export public Key')
+        user_hbox = QHBoxLayout()
+        self.user_field = QLineEdit()
+        self.user_field.setEnabled(False)
+        self.user_field.setPlaceholderText('Key')
+        user_hbox.addWidget(self.user_field)
+        user_hbox.addWidget(self.load_key_button)
+        user_hbox.addWidget(self.export_key_button)
 
-    def slot_sendTransactionData(self, receive_queue, to, amount):
-        self.lineEditHistory.append("transaction " + str(to.text()) + ' ' + str(amount.text()))
-        self.lineHistoryCounter = len(self.lineEditHistory)
-        #print("transaction " + str(to.text()) + ' ' + str(amount.text()))
-        receive_queue.put("transaction " + str(to.text()) + ' ' + str(amount.text()))
+        self.user_group_box_form.addRow(QLabel('User:'), user_hbox)
 
-    def slot_lineEdit(self, receiveQueue, line):
-        self.lineEditHistory.append(str(line.text()))
-        self.lineHistoryCounter = len(self.lineEditHistory)
-        #print("size: {}, list[0]: {}".format(len(self.lineEditHistory), self.lineEditHistory[0]))
-        text = str(line.text())
-        line.clear()
-        receiveQueue.put(text)
+        self.user_group_box_layout.addLayout(self.user_group_box_form)
+        self.user_group_box.setLayout(self.user_group_box_layout)
+        self.layout.addWidget(self.user_group_box)
 
-    def keyPressEvent(self, event):
-        if(event.key() == QtCore.Qt.Key_Up):
-            if(self.lineEditHistory and self.lineHistoryCounter > 0):# and (not self.lineEditHistory[0] == 'gui')):
-                lineQueue.put(self.lineEditHistory[self.lineHistoryCounter-1])
-                self.lineHistoryCounter -= 1
-        elif(event.key() == QtCore.Qt.Key_Down):
-            if(self.lineHistoryCounter < len(self.lineEditHistory)):
-                lineQueue.put(self.lineEditHistory[self.lineHistoryCounter])
-                self.lineHistoryCounter += 1
+        self.transaction_group_box = QGroupBox()
 
+        self.transaction_group_box_layout = QVBoxLayout()
+        self.transaction_group_box_form = QFormLayout()
+
+        self.transaction_group_box_form.addRow(QLabel('New Transaction:'))
+        self.recipient_edit = QLineEdit()
+        self.recipient_edit.setPlaceholderText('Recipient')
+        self.amount_edit = QSpinBox()
+        self.amount_edit.setMaximum(9999)
+        self.send_button = QPushButton('Send')
+
+        self.transaction_group_box_form.addRow(QLabel(), self.recipient_edit)
+        self.transaction_group_box_form.addRow(QLabel('Amount'), self.amount_edit)
+        self.transaction_group_box_form.addRow(QLabel(), self.send_button)
+
+        self.transaction_group_box_layout.addLayout(self.transaction_group_box_form)
+        self.transaction_group_box.setLayout(self.transaction_group_box_layout)
+        self.layout.addWidget(self.transaction_group_box)
+
+        self.setLayout(self.layout)
 

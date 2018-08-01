@@ -18,6 +18,8 @@ class Keystore:
             print_debug_info(f'File not found: {self.filename}')
         except pickle.PickleError as e:
             print_debug_info(f'Error with pickle: {e}')
+        except EOFError as e:
+            print_debug_info(f'Error with file: {e}')
 
     def save(self):
         try:
