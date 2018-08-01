@@ -6,8 +6,12 @@
 
 ### Prerequisites
 
-* NaCl (Cryptography)\
- `pip install pynacl`
+* NaCl (Cryptography)
+* PyQT5 (GUI)
+
+```
+pip install -r requirements.txt
+```
 
 ### Setup
 
@@ -77,5 +81,5 @@ Messages contain a message-type and message-data
 
 ### Tests
 
-For testing run py.test -v\
+For testing run pytest -v\
 Additional stress-tests are in  [stress-test.py](./stress-test.py)
