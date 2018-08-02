@@ -36,11 +36,12 @@ class TestCore():
             self.chain,
             self.processor
         )
-        assert block in self.chain.chain
+        assert block.header in self.chain.chain
+        assert self.chain.chain[block.header] == block.transactions
         assert not core.send_queue.empty()
         send_msg = core.send_queue.get(block=False)
         assert send_msg[0] == 'new_block'
-        assert send_msg[1] == self.chain.chain[-1]
+        assert send_msg[1] == self.chain.latest_block()
         assert send_msg[2] == 'broadcast'
 
     def test_new_transaction(self):
@@ -63,7 +64,7 @@ class TestCore():
         assert not core.send_queue.empty()
         send_msg = core.send_queue.get(block=False)
         assert send_msg[0] == 'new_block'
-        assert send_msg[1] == self.chain.chain[-1]
+        assert send_msg[1] == self.chain.latest_block()
         assert send_msg[2] == 'broadcast'
         assert self.chain.check_balance(
             self.test_obj.sender_verify, time.time) > 0
@@ -81,7 +82,7 @@ class TestCore():
         assert not core.send_queue.empty()
         send_msg = core.send_queue.get(block=False)
         assert send_msg[0] == 'new_block'
-        assert send_msg[1] == self.chain.chain[-1]
+        assert send_msg[1] == self.chain.latest_block()
         assert send_msg[2] == self.address
 
     def test_get_chain_resolve_conflict(self):
@@ -99,7 +100,7 @@ class TestCore():
         assert not core.send_queue.empty()
         send_msg = core.send_queue.get(block=False)
         assert send_msg[0] == 'resolve_conflict'
-        assert send_msg[1] == self.chain.chain
+        assert send_msg[1] == self.chain.get_block_chain()
         assert send_msg[2] == self.address
         copied_chain = list(send_msg[1])
 
@@ -111,7 +112,7 @@ class TestCore():
             self.chain,
             self.processor
         )
-        assert self.chain.chain == copied_chain
+        assert self.chain.get_block_chain() == copied_chain
 
     def test_print_balance(self, capsys):
         """ Test receive message functionality for print_balance.

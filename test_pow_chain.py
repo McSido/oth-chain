@@ -12,6 +12,8 @@ import nacl.signing
 
 import pow_chain
 
+VERSION = 0.7
+
 
 class TestPOW():
     """ Testcase used to bundle all tests for the
@@ -22,7 +24,7 @@ class TestPOW():
         """ Setup of the blockchain for the tests.
         """
         self.sends = Queue()
-        self.blockchain = pow_chain.PoW_Blockchain(self.sends)
+        self.blockchain = pow_chain.PoW_Blockchain(VERSION, self.sends)
         self.sender_sign = nacl.signing.SigningKey(seed=b'a' * 32)
         self.sender_verify = self.sender_sign.verify_key.encode(
             nacl.encoding.HexEncoder)
@@ -125,6 +127,8 @@ class TestPOW():
 
         assert transaction in self.blockchain.transaction_pool
         assert not self.sends.empty()
+
+    # ####################### HELPER FUNCTIONS ###########################
 
     def mine_block(self):
         """ Mine an initial block to add a balance to the test account.

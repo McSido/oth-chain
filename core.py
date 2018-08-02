@@ -39,9 +39,7 @@ networker_command_queue: Queue = Queue()
 gui_send_queue: Queue = Queue()
 gui_receive_queue: Queue = Queue()
 
-
-# keystore = dict()
-# keystore_filename = 'keystore'
+VERSION = 0.7
 
 
 def receive_msg(msg_type: str, msg_data: Any, msg_address: Address,
@@ -60,7 +58,9 @@ def receive_msg(msg_type: str, msg_data: Any, msg_address: Address,
         block = blockchain.latest_block()
         send_queue.put(('new_block', block, msg_address))
     elif msg_type == 'get_chain':
-        send_queue.put(('resolve_conflict', blockchain.chain, msg_address))
+        # Change data to headers only
+        send_queue.put(
+            ('resolve_conflict', blockchain.get_block_chain(), msg_address))
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
     else:
@@ -163,7 +163,7 @@ def init(keystore_filename: str, port: int, signing_key):
         signing_key: Key of the current user
     """
     # Create proof-of-work blockchain
-    my_blockchain = PoW_Blockchain(send_queue)
+    my_blockchain = PoW_Blockchain(VERSION, send_queue)
     my_blockchain_processor = my_blockchain.process_message()
 
     # Create networking thread

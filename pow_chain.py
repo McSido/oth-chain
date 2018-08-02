@@ -10,8 +10,9 @@ from typing import Any, Callable, Dict, List
 import nacl.encoding
 import nacl.signing
 from nacl.exceptions import BadSignatureError
+from collections import OrderedDict
 
-from blockchain import Block, Blockchain, Transaction
+from blockchain import Block, Blockchain, Transaction, Header
 from networking import Address
 from utils import print_debug_info
 
@@ -23,29 +24,30 @@ class PoW_Blockchain(Blockchain):
         send_queue: Queue for messages to other nodes.
     """
 
-    def new_block(self, block: Block):
-        """ Adds a provided block to the chain after checking it for validity.
+    def validate_header(self, header: Header, last_header: Header) -> bool:
+        """ Validates a block-header.
 
         Args:
-            block: The block to be added to the chain.
+            header: Header that should be validated
+            last_header: Header of current last block.
         """
-        if block.index > self.latest_block().index + 1:
-            # block higher then current chain:
-            # resolve conflict between chains
-            self.send_queue.put(('get_chain', '', 'broadcast'))
-            print_debug_info('Chain out-of-date.')
-            print_debug_info('Updating...')
-            return
 
-        if self.validate_block(block, self.chain[-1]):
-            # remove transactions in new block from own transaction pool
-            for block_transaction in block.transactions:
-                if block_transaction in self.transaction_pool:
-                    self.transaction_pool.remove(block_transaction)
-            self.send_queue.put(('new_block', block, 'broadcast'))
-            self.chain.append(block)
-        else:
-            print_debug_info('Invalid block')
+        # check if previous block == last_block
+        if header.previous_hash != last_header.root_hash:
+            return False
+
+        # check order of time
+        if header.timestamp < last_header.timestamp:
+            return False
+
+        # Check that version of the block can be processed
+        if header.version > self.version:
+            print_debug_info(f'Received block with version {header.version},' +
+                             ' but your current version is {self.version}.\n' +
+                             'Check if there is a newer version available.')
+            return False
+
+        return True
 
     def validate_block(self, block: Block, last_block: Block) -> bool:
         """ Validates a provided block.
@@ -62,9 +64,10 @@ class PoW_Blockchain(Blockchain):
         Returns:
             The validity (True/False) of the block
         """
-        # check if the hash of the new block is valid
-        if block.previous_hash != self.hash(last_block):
+        # check if the header of the block is valid
+        if not self.validate_header(block.header, last_block.header):
             return False
+
         # check if the proof of the new block is valid
         mining_transaction = None
         mining_transaction_found = False
@@ -75,13 +78,13 @@ class PoW_Blockchain(Blockchain):
                     return False
                 mining_transaction = transaction
                 mining_transaction_found = True
-                if not self.validate_proof(last_block, block.proof,
+                if not self.validate_proof(last_block, block.header.proof,
                                            mining_transaction.recipient):
                     return False
                 fee_sum = 0
                 for block_transaction in block.transactions:
                     fee_sum += block_transaction.fee
-                reward_multiplicator = math.floor(block.index / 10) - 1
+                reward_multiplicator = math.floor(block.header.index / 10) - 1
 
                 mining_reward = 50 >> 2 ** reward_multiplicator \
                     if reward_multiplicator >= 0 else 50
@@ -165,7 +168,7 @@ class PoW_Blockchain(Blockchain):
             The calculated proof.
         """
         proof = 0
-        last_block = self.chain[-1]
+        last_block = self.latest_block()
         while self.validate_proof(last_block, proof, miner_key) is False:
             proof += 1
         return proof
@@ -187,7 +190,7 @@ class PoW_Blockchain(Blockchain):
             Validity(True/False) of the proof
         """
         difficulty = self.scale_difficulty(last_block)
-        test_proof = f'{last_block.proof}{proof}{miner_key}'.encode()
+        test_proof = f'{last_block.header.proof}{proof}{miner_key}'.encode()
         test_hash = self.hash(test_proof)
         return test_hash[:difficulty] == '0' * difficulty
 
@@ -205,20 +208,21 @@ class PoW_Blockchain(Blockchain):
             # Validate new chain:
             # store old chain, and set self.chain to new_chain
             # (needed for check_balance)
-            old_chain = list(self.chain)
-            self.chain = new_chain
-            last_block = new_chain[0]
-            current_index = 1
-            while current_index < len(new_chain):
-                block = new_chain[current_index]
-                if not self.validate_block(block, last_block):
-                    print_debug_info(
-                        'Conflict resolved (old chain)')
+            old_chain = OrderedDict(self.chain)
+            self.chain.clear()
+            for block in new_chain:
+                self.chain[block.header] = block.transactions
+
+            t_header = next(self.chain)
+            old_block = Block(t_header, self.chain[t_header])
+            for h, t in self.chain.items():
+                if h == old_block.header:
+                    continue  # Ignore first block
+                if not self.validate_block(Block(h, t), old_block):
+                    print_debug_info('Conflict resolved (old chain)')
                     self.chain = old_chain
                     return
-                last_block = block
-                current_index += 1
-            # self.chain = new_chain
+                old_block = Block(h, t)
             print_debug_info('Conflict resolved (new chain)')
         else:
             print_debug_info('Conflict resolved (old chain)')
@@ -238,7 +242,8 @@ class PoW_Blockchain(Blockchain):
             The difficulty for the current block.
         """
         try:
-            difficulty = max(math.floor(math.log(last_block.index) / 2), 1)
+            difficulty = max(math.floor(
+                math.log(last_block.header.index) / 2), 1)
         except ValueError:
             difficulty = 1
         return difficulty
@@ -267,7 +272,7 @@ class PoW_Blockchain(Blockchain):
             fee_sum = 0
             for transaction in block.transactions:
                 fee_sum += transaction.fee
-            reward_multiplier = math.floor(block.index / 10) - 1
+            reward_multiplier = math.floor(block.header.index / 10) - 1
             mining_reward = 50 >> 2**reward_multiplier\
                 if reward_multiplier >= 0 else 50
             block.transactions.append(
@@ -319,4 +324,4 @@ class PoW_Blockchain(Blockchain):
         Returns:
             Difficulty of the current block.
         """
-        return self.scale_difficulty(self.chain[-1])
+        return self.scale_difficulty(self.latest_block())
