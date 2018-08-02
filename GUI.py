@@ -2,6 +2,8 @@ import sys
 import threading
 import datetime
 from functools import partial
+
+from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import *
 from PyQt5 import QtGui, QtCore
 from queue import Queue
@@ -26,7 +28,6 @@ class ChainGUI(QMainWindow):
         self.keystore = keystore
 
     def initUI(self, receive_queue):
-
         self.splitter = QSplitter()
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
@@ -43,23 +44,7 @@ class TabWidget(QWidget):
         self.tabs = QTabWidget()
         self.chain_tab = QWidget()
         self.peers_tab = QWidget()
-        self.keystore_tab = QWidget()
-
-        self.keystore_tab_layout = QVBoxLayout()
-        self.keystore_tab_key_group = QGroupBox()
-        self.keystore_tab_key_group_layout = QVBoxLayout()
-        # TODO: Make dedicated classes for the tabs
-        for key, value in self.parent().keystore.store.items():
-            delete_button = QPushButton('Delete')
-            hbox = QHBoxLayout()
-            hbox.addWidget(QLabel(key))
-            hbox.addWidget(QLabel(str(value)))
-            hbox.addWidget(delete_button)
-            self.keystore_tab_key_group_layout.addLayout(hbox)
-        self.keystore_tab_key_group.setLayout(self.keystore_tab_key_group_layout)
-        self.keystore_tab_layout.addWidget(self.keystore_tab_key_group)
-        self.keystore_tab.setLayout(self.keystore_tab_layout)
-
+        self.keystore_tab = KeystoreWidget(self)
 
         self.tabs.addTab(self.chain_tab, 'Chain history')
         self.tabs.addTab(self.peers_tab, 'Peers')
@@ -67,6 +52,90 @@ class TabWidget(QWidget):
 
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
+
+
+class KeystoreWidget(QWidget):
+
+    def __init__(self, parent):
+        super(KeystoreWidget, self).__init__(parent)
+        self.keystore = self.parent().parent().keystore
+        self.layout = QVBoxLayout()
+        self.key_list = QListView()
+        self.key_list.setHorizontalScrollBar(QScrollBar(QtCore.Qt.Horizontal))
+        self.key_list.setVerticalScrollBar(QScrollBar(QtCore.Qt.Vertical))
+        self.model = QStandardItemModel(self.key_list)
+        self.model.itemChanged.connect(self.set_item)
+        self.checked_items = []
+        self.load_data()
+
+        self.key_list.setModel(self.model)
+        self.layout.addWidget(self.key_list)
+
+        self.delete_button = QPushButton('Delete selected keys')
+        self.delete_button.clicked.connect(self.delete_keys)
+        self.layout.addWidget(self.delete_button)
+
+        self.import_key_button = QPushButton('Import key')
+        self.import_key_button.clicked.connect(self.import_key)
+        self.import_key_name_edit = QLineEdit()
+        self.import_key_name_edit.setPlaceholderText('Name')
+        self.import_key_file_explorer = QPushButton('Select file')
+        self.import_key_file_explorer.clicked.connect(self.get_key_file)
+
+        self.import_key_file_name = None
+
+        self.import_key_group = QGroupBox()
+        self.import_key_group.setLayout(QVBoxLayout())
+        self.import_key_group_form = QFormLayout()
+        self.import_key_group_form.addRow(QLabel('Import key:'))
+        self.import_key_group_form.addRow(QLabel('Key file:'), self.import_key_file_explorer)
+        hbox = QHBoxLayout()
+        hbox.addWidget(self.import_key_name_edit)
+        hbox.addWidget(self.import_key_button)
+        self.import_key_group_form.addRow(hbox)
+        self.import_key_group.layout().addLayout(self.import_key_group_form)
+        self.layout.addWidget(self.import_key_group)
+
+        self.setLayout(self.layout)
+
+    def set_item(self, item):
+        if item.checkState() == QtCore.Qt.Checked:
+            self.checked_items.append(item)
+        elif item.checkState() == QtCore.Qt.Unchecked:
+            self.checked_items.remove(item)
+
+    def delete_keys(self):
+        self.checked_items.sort(key=lambda x: x.row())
+        for item in self.checked_items[::-1]:
+            key = item.text().split(':')[0]
+            self.keystore.update_key(key, '')
+            self.model.removeRow(item.row())
+        self.checked_items = []
+
+    def load_data(self):
+        for key, value in self.keystore.store.items():
+            item = QStandardItem(f'{key}: {str(value)}')
+            item.setCheckable(True)
+            self.model.appendRow(item)
+
+    def get_key_file(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        self.import_key_file_name, _ = QFileDialog.getOpenFileName(self, 'Select key file', '',
+                                                                   'All Files (*);;', options=options)
+        self.import_key_file_explorer.setText(self.import_key_file_name)
+
+    def import_key(self):
+        key_name = self.import_key_name_edit.text()
+        key, success = self.keystore.add_key(key_name, self.import_key_file_name)
+        if not success:
+            old_key = self.keystore.update_key(key_name, self.import_key_file_name)
+            item = self.model.findItems(f'{key_name}: {str(old_key)}')[0]
+            item.setText(f'{key_name}: {str(key)}')
+        else:
+            item = QStandardItem(f'{key_name}: {str(key)}')
+            item.setCheckable(True)
+            self.model.appendRow(item)
 
 
 class TransactionWidget(QWidget):
@@ -117,4 +186,3 @@ class TransactionWidget(QWidget):
         self.layout.addWidget(self.transaction_group_box)
 
         self.setLayout(self.layout)
-

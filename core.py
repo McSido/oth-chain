@@ -23,7 +23,7 @@ import networking
 from networking import Address
 from blockchain import Blockchain
 from GUI import *
-from keystore import Keystore
+from keystore import Keystore, load_key, save_key
 from pow_chain import PoW_Blockchain, Transaction
 from utils import print_debug_info, set_debug
 
@@ -86,27 +86,6 @@ def blockchain_loop(blockchain: Blockchain, processor):
                 f'Assertion Error on message\
                  {msg_type}:{msg_data}:{msg_address}')
             print_debug_info(e)
-
-
-def load_key(filename):
-    """ Attempts to load a key from the provided file.
-
-    Args:
-        filename: Specifies the key file.
-    """
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
-
-
-def save_key(key, filename):
-    """ Attempts to save the provided key to the provided file.
-
-    Args:
-        key: The key to be saved.
-        filename: The filename of the saved key.
-    """
-    with open(filename, 'wb') as f:
-        pickle.dump(key, f)
 
 
 def parse_args(argv):
@@ -314,10 +293,10 @@ keystore
             try:
                 t = command.split(' ')
                 if keystore.resolve_name(t[2]):
-                    keystore.update_key(t[2], load_key(t[1]))
+                    keystore.update_key(t[2], t[1])
                 else:
                     print('importing public key')
-                    keystore.add_key(t[1], load_key(t[1]))
+                    keystore.add_key(t[2], t[1])
             except Exception as e:
                 print('Could not import key')
                 print(e)
