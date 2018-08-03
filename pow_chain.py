@@ -21,6 +21,7 @@ class PoW_Blockchain(Blockchain):
 
     Args:
         send_queue: Queue for messages to other nodes.
+        gui_queue: Queue for interaction with the gui.
     """
 
     def new_block(self, block: Block):
@@ -292,6 +293,9 @@ class PoW_Blockchain(Blockchain):
             self.save_chain()
 
         def dump_vars(_: Any, msg_address: Address):
+            if msg_address == 'gui':
+                self.gui_queue.put(self.chain, block=True)
+                return
             if msg_address != 'local':
                 return
             pprint(vars(self))

@@ -27,10 +27,11 @@ class Blockchain(object):
         send_queue: Queue for messages to other nodes
     """
 
-    def __init__(self, send_queue: Queue) -> None:
+    def __init__(self, send_queue: Queue, gui_queue: Queue) -> None:
         self.chain: List[Block] = []
         self.transaction_pool: List[Transaction] = []
         self.send_queue = send_queue
+        self.gui_queue = gui_queue
         self.load_chain()
 
     def check_balance(self, key: bytes, timestamp: float) -> int:

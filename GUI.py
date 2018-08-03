@@ -11,10 +11,10 @@ from queue import Queue
 lineQueue = Queue()
 
 
-def gui_loop(gui_send_queue, gui_receive_queue, keystore):
+def gui_loop(gui_queue, chain_queue, keystore):
     app = QApplication(sys.argv)
     ex = ChainGUI(keystore)
-    ex.initUI(gui_receive_queue)
+    ex.initUI(chain_queue, gui_queue)
 
     sys.exit(app.exec_())
 
@@ -27,11 +27,14 @@ class ChainGUI(QMainWindow):
         self.lineHistoryCounter = len(self.lineEditHistory)
         self.keystore = keystore
 
-    def initUI(self, receive_queue):
+    def initUI(self, chain_queue, gui_queue):
         self.splitter = QSplitter()
+        self.chain_queue = chain_queue
+        self.gui_queue = gui_queue
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
+        self.setWindowTitle('OTH-Chain')
         self.show()
 
 
@@ -42,7 +45,7 @@ class TabWidget(QWidget):
         self.layout = QVBoxLayout(self)
 
         self.tabs = QTabWidget()
-        self.chain_tab = QWidget()
+        self.chain_tab = ChainHistoryWidget(self)
         self.peers_tab = QWidget()
         self.keystore_tab = KeystoreWidget(self)
 
@@ -52,6 +55,77 @@ class TabWidget(QWidget):
 
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
+
+
+class ChainHistoryWidget(QWidget):
+
+    def __init__(self, parent):
+        super(ChainHistoryWidget, self).__init__(parent)
+        self.layout = QVBoxLayout()
+        self.chain_queue = self.parent().parent().chain_queue
+        self.gui_queue = self.parent().parent().gui_queue
+
+        self.history = QTreeWidget()
+        self.history.setVerticalScrollBar(QScrollBar(QtCore.Qt.Vertical))
+        self.history.setHorizontalScrollBar(QScrollBar(QtCore.Qt.Horizontal))
+        self.history.setColumnCount(2)
+
+        self.layout.addWidget(self.history)
+        self.load_data()
+
+        self.setLayout(self.layout)
+
+    def load_data(self):
+        self.chain_queue.put(('dump', '', 'gui'))
+        self.chain = self.gui_queue.get(block=True)
+        print(self.chain)
+        for block in self.chain[::-1]:
+            self.add_tree_item(block)
+
+    def add_tree_item(self, block):
+        item = QTreeWidgetItem()
+        item.setText(0, 'Block')
+        item.setText(1, '#' + str(block.index))
+        self.history.addTopLevelItem(item)
+        timestamp = QTreeWidgetItem()
+        timestamp.setText(0, 'Timestamp:')
+        timestamp.setText(1, str(block.timestamp))
+        proof = QTreeWidgetItem()
+        proof.setText(0, 'Proof:')
+        proof.setText(1, str(block.proof))
+        prev_hash = QTreeWidgetItem()
+        prev_hash.setText(0, 'Previous hash:')
+        prev_hash.setText(1, str(block.previous_hash))
+        item.addChild(timestamp)
+        item.addChild(proof)
+        item.addChild(prev_hash)
+        transactions = QTreeWidgetItem()
+        transactions.setText(0, 'Transactions:')
+        item.addChild(transactions)
+        for i, transaction in enumerate(block.transactions):
+            t = QTreeWidgetItem()
+            t.setText(0, 'Transaction')
+            t.setText(1, '#' + str(i))
+            sender = QTreeWidgetItem()
+            sender.setText(0, 'Sender:')
+            sender.setText(1, str(transaction.sender))
+            recipient = QTreeWidgetItem()
+            recipient.setText(0, 'Recipient:')
+            recipient.setText(1, str(transaction.recipient))
+            amount = QTreeWidgetItem()
+            amount.setText(0, 'Amount:')
+            amount.setText(1, str(transaction.amount))
+            fee = QTreeWidgetItem()
+            fee.setText(0, 'Fee:')
+            fee.setText(1, str(transaction.fee))
+            t_timestamp = QTreeWidgetItem()
+            t_timestamp.setText(0, 'Timestamp:')
+            t_timestamp.setText(1, str(transaction.timestamp))
+            signature = QTreeWidgetItem()
+            signature.setText(0, 'Signature')
+            signature.setText(1, str(transaction.signature))
+            t.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
+            transactions.addChild(t)
 
 
 class KeystoreWidget(QWidget):
@@ -102,7 +176,10 @@ class KeystoreWidget(QWidget):
         if item.checkState() == QtCore.Qt.Checked:
             self.checked_items.append(item)
         elif item.checkState() == QtCore.Qt.Unchecked:
-            self.checked_items.remove(item)
+            try:
+                self.checked_items.remove(item)
+            except ValueError:
+                pass
 
     def delete_keys(self):
         self.checked_items.sort(key=lambda x: x.row())
@@ -131,7 +208,11 @@ class KeystoreWidget(QWidget):
         if not success:
             old_key = self.keystore.update_key(key_name, self.import_key_file_name)
             item = self.model.findItems(f'{key_name}: {str(old_key)}')[0]
-            item.setText(f'{key_name}: {str(key)}')
+            row = item.row()
+            self.model.removeRow(row)
+            item = QStandardItem(f'{key_name}: {str(key)}')
+            item.setCheckable(True)
+            self.model.insertRow(row, item)
         else:
             item = QStandardItem(f'{key_name}: {str(key)}')
             item.setCheckable(True)

@@ -74,7 +74,7 @@ def blockchain_loop(blockchain: Blockchain, processor):
 
     Args:
         blockchain: The blockchain upon which to operate.
-        processer: Processer used to handle blockchain messages.
+        processor: Processor used to handle blockchain messages.
     """
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
@@ -142,7 +142,7 @@ def init(keystore_filename: str, port: int, signing_key):
         signing_key: Key of the current user
     """
     # Create proof-of-work blockchain
-    my_blockchain = PoW_Blockchain(send_queue)
+    my_blockchain = PoW_Blockchain(send_queue, gui_send_queue)
     my_blockchain_processor = my_blockchain.process_message()
 
     # Create networking thread
@@ -176,7 +176,7 @@ def init(keystore_filename: str, port: int, signing_key):
     # gui thread
     gui_thread = threading.Thread(
         target=gui_loop,
-        args=(gui_send_queue, gui_receive_queue, keystore), )  # daemon=True
+        args=(gui_send_queue, receive_queue, keystore), )  # daemon=True
 
     return keystore, signing_key, verify_key_hex, networker, \
         blockchain_thread, gui_thread
@@ -215,7 +215,7 @@ def main(argv):
         command = command.lower().strip()
         command = re.sub(r'\s\s*', ' ', command)
 
-        gui_send_queue.put(command)
+        # gui_send_queue.put(command)
         if command == 'help':
             help_str = (""" Available commands:
                 help: prints commands
