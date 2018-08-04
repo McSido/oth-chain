@@ -1,17 +1,16 @@
 import sys
 import threading
 import time
-from functools import partial
+from keystore import Keystore
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import *
-from PyQt5 import QtGui, QtCore
+from PyQt5 import QtCore
 from queue import Queue
+from blockchain import Block, Transaction
 
-lineQueue = Queue()
 
-
-def gui_loop(gui_queue, chain_queue, keystore):
+def gui_loop(gui_queue: Queue, chain_queue: Queue, keystore: Keystore):
     app = QApplication(sys.argv)
     ex = ChainGUI(keystore)
     ex.initUI(chain_queue, gui_queue)
@@ -21,13 +20,13 @@ def gui_loop(gui_queue, chain_queue, keystore):
 
 class ChainGUI(QMainWindow):
 
-    def __init__(self, keystore):
+    def __init__(self, keystore: Keystore):
         super(ChainGUI, self).__init__()
         self.lineEditHistory = list()
         self.lineHistoryCounter = len(self.lineEditHistory)
         self.keystore = keystore
 
-    def initUI(self, chain_queue, gui_queue):
+    def initUI(self, chain_queue: Queue, gui_queue: Queue):
         self.splitter = QSplitter()
         self.chain_queue = chain_queue
         self.gui_queue = gui_queue
@@ -47,13 +46,14 @@ class ChainGUI(QMainWindow):
         while True:
             msg_type, msg_data, msg_address = self.gui_queue.get(block=True)
             if msg_type == 'new_block':
-                self.splitter.widget(0).chain_tab.add_tree_item(msg_data)
-
+                self.splitter.widget(0).chain_tab.new_block(msg_data)
+            elif msg_type == 'new_transaction':
+                self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
 
 
 class TabWidget(QWidget):
 
-    def __init__(self, parent):
+    def __init__(self, parent: QWidget):
         super(TabWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
 
@@ -72,7 +72,7 @@ class TabWidget(QWidget):
 
 class ChainHistoryWidget(QWidget):
 
-    def __init__(self, parent):
+    def __init__(self, parent: QWidget):
         super(ChainHistoryWidget, self).__init__(parent)
         self.layout = QVBoxLayout()
         self.chain_queue = self.parent().parent().chain_queue
@@ -107,7 +107,7 @@ class ChainHistoryWidget(QWidget):
         for transaction in self.transaction_pool:
             self.add_transaction_pool_item(transaction)
 
-    def add_tree_item(self, block):
+    def add_tree_item(self, block: Block):
         item = QTreeWidgetItem()
         item.setText(0, 'Block')
         item.setText(1, '#' + str(block.index))
@@ -154,7 +154,7 @@ class ChainHistoryWidget(QWidget):
             t.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
             transactions.addChild(t)
 
-    def add_transaction_pool_item(self, transaction):
+    def add_transaction_pool_item(self, transaction: Transaction):
         item = QTreeWidgetItem()
         item.setText(0, 'Transaction')
         item.setText(1, '#' + str(self.transaction_pool_item.childCount()))
@@ -172,18 +172,34 @@ class ChainHistoryWidget(QWidget):
         fee.setText(1, str(transaction.fee))
         t_timestamp = QTreeWidgetItem()
         t_timestamp.setText(0, 'Timestamp:')
-        t_timestamp.setText(1, str(transaction.timestamp))
+        t_timestamp.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
+                                               time.gmtime(transaction.timestamp))))
         signature = QTreeWidgetItem()
         signature.setText(0, 'Signature')
-        signature.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
-                                               time.gmtime(transaction.timestamp))))
+        signature.setText(1, str(transaction.signature))
         item.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
-        self.transaction_pool_item.addChild(item)
+        self.transaction_pool_item.insertChild(0, item)
+
+    def new_block(self, block: Block):
+        self.add_tree_item(block)
+        self.clear_transaction_pool(block.transactions)
+
+    def clear_transaction_pool(self, transaction_list: list):
+        items_to_delete = []
+        for transaction in transaction_list:
+            timestamp = time.strftime("%d.%m.%Y %H:%M:%S %Z",
+                                      time.gmtime(transaction.timestamp))
+            for i in range(self.transaction_pool_item.childCount()):
+                if self.transaction_pool_item.child(i).child(4).text(1) == timestamp:
+                    items_to_delete.append(self.transaction_pool_item.child(i))
+
+        for item in items_to_delete:
+            self.transaction_pool_item.removeChild(item)
 
 
 class KeystoreWidget(QWidget):
 
-    def __init__(self, parent):
+    def __init__(self, parent: QWidget):
         super(KeystoreWidget, self).__init__(parent)
         self.keystore = self.parent().parent().keystore
         self.layout = QVBoxLayout()
@@ -225,7 +241,7 @@ class KeystoreWidget(QWidget):
 
         self.setLayout(self.layout)
 
-    def set_item(self, item):
+    def set_item(self, item: QStandardItem):
         if item.checkState() == QtCore.Qt.Checked:
             self.checked_items.append(item)
         elif item.checkState() == QtCore.Qt.Unchecked:
@@ -274,7 +290,7 @@ class KeystoreWidget(QWidget):
 
 class TransactionWidget(QWidget):
 
-    def __init__(self, parent):
+    def __init__(self, parent: QWidget):
         super(TransactionWidget, self).__init__(parent)
         self.layout = QVBoxLayout(self)
 

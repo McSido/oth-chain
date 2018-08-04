@@ -104,6 +104,8 @@ class Blockchain(object):
         if self.validate_transaction(transaction):
             self.transaction_pool.append(transaction)
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
+            if self.gui_ready:
+                self.gui_queue.put(('new_transaction', transaction, 'local'))
         else:
             print_debug_info('Invalid transaction')
 
