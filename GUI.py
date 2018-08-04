@@ -37,6 +37,19 @@ class ChainGUI(QMainWindow):
         self.setWindowTitle('OTH-Chain')
         self.show()
 
+        message_thread = threading.Thread(
+            target=self.wait_for_message
+        )
+        message_thread.setDaemon(True)
+        message_thread.start()
+
+    def wait_for_message(self):
+        while True:
+            msg_type, msg_data, msg_address = self.gui_queue.get(block=True)
+            if msg_type == 'new_block':
+                self.splitter.widget(0).chain_tab.add_tree_item(msg_data)
+
+
 
 class TabWidget(QWidget):
 
@@ -89,7 +102,7 @@ class ChainHistoryWidget(QWidget):
         self.chain = data[0]
         self.transaction_pool = data[1]
         print(self.chain)
-        for block in self.chain[::-1]:
+        for block in self.chain:
             self.add_tree_item(block)
         for transaction in self.transaction_pool:
             self.add_transaction_pool_item(transaction)
@@ -98,7 +111,7 @@ class ChainHistoryWidget(QWidget):
         item = QTreeWidgetItem()
         item.setText(0, 'Block')
         item.setText(1, '#' + str(block.index))
-        self.history.addTopLevelItem(item)
+        self.history.insertTopLevelItem(1, item)
         timestamp = QTreeWidgetItem()
         timestamp.setText(0, 'Timestamp:')
         timestamp.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
