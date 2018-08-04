@@ -1,6 +1,6 @@
 import sys
 import threading
-import datetime
+import time
 from functools import partial
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
@@ -101,7 +101,8 @@ class ChainHistoryWidget(QWidget):
         self.history.addTopLevelItem(item)
         timestamp = QTreeWidgetItem()
         timestamp.setText(0, 'Timestamp:')
-        timestamp.setText(1, str(block.timestamp))
+        timestamp.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
+                                               time.gmtime(block.timestamp))))
         proof = QTreeWidgetItem()
         proof.setText(0, 'Proof:')
         proof.setText(1, str(block.proof))
@@ -132,7 +133,8 @@ class ChainHistoryWidget(QWidget):
             fee.setText(1, str(transaction.fee))
             t_timestamp = QTreeWidgetItem()
             t_timestamp.setText(0, 'Timestamp:')
-            t_timestamp.setText(1, str(transaction.timestamp))
+            t_timestamp.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
+                                                     time.gmtime(transaction.timestamp))))
             signature = QTreeWidgetItem()
             signature.setText(0, 'Signature')
             signature.setText(1, str(transaction.signature))
@@ -160,7 +162,8 @@ class ChainHistoryWidget(QWidget):
         t_timestamp.setText(1, str(transaction.timestamp))
         signature = QTreeWidgetItem()
         signature.setText(0, 'Signature')
-        signature.setText(1, str(transaction.signature))
+        signature.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
+                                               time.gmtime(transaction.timestamp))))
         item.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
         self.transaction_pool_item.addChild(item)
 
