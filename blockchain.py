@@ -31,6 +31,7 @@ class Blockchain(object):
         self.chain: List[Block] = []
         self.transaction_pool: List[Transaction] = []
         self.send_queue = send_queue
+        self.gui_ready = False
         self.gui_queue = gui_queue
         self.load_chain()
 

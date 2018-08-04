@@ -71,16 +71,28 @@ class ChainHistoryWidget(QWidget):
         self.history.setColumnCount(2)
 
         self.layout.addWidget(self.history)
+
+        self.transaction_pool_item = QTreeWidgetItem()
+        self.transaction_pool_item.setText(0, 'Transaction Pool')
+        self.history.addTopLevelItem(self.transaction_pool_item)
+
+        self.chain = []
+        self.transaction_pool = []
+
         self.load_data()
 
         self.setLayout(self.layout)
 
     def load_data(self):
         self.chain_queue.put(('dump', '', 'gui'))
-        self.chain = self.gui_queue.get(block=True)
+        data = self.gui_queue.get(block=True)[1]
+        self.chain = data[0]
+        self.transaction_pool = data[1]
         print(self.chain)
         for block in self.chain[::-1]:
             self.add_tree_item(block)
+        for transaction in self.transaction_pool:
+            self.add_transaction_pool_item(transaction)
 
     def add_tree_item(self, block):
         item = QTreeWidgetItem()
@@ -126,6 +138,31 @@ class ChainHistoryWidget(QWidget):
             signature.setText(1, str(transaction.signature))
             t.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
             transactions.addChild(t)
+
+    def add_transaction_pool_item(self, transaction):
+        item = QTreeWidgetItem()
+        item.setText(0, 'Transaction')
+        item.setText(1, '#' + str(self.transaction_pool_item.childCount()))
+        sender = QTreeWidgetItem()
+        sender.setText(0, 'Sender:')
+        sender.setText(1, str(transaction.sender))
+        recipient = QTreeWidgetItem()
+        recipient.setText(0, 'Recipient:')
+        recipient.setText(1, str(transaction.recipient))
+        amount = QTreeWidgetItem()
+        amount.setText(0, 'Amount:')
+        amount.setText(1, str(transaction.amount))
+        fee = QTreeWidgetItem()
+        fee.setText(0, 'Fee:')
+        fee.setText(1, str(transaction.fee))
+        t_timestamp = QTreeWidgetItem()
+        t_timestamp.setText(0, 'Timestamp:')
+        t_timestamp.setText(1, str(transaction.timestamp))
+        signature = QTreeWidgetItem()
+        signature.setText(0, 'Signature')
+        signature.setText(1, str(transaction.signature))
+        item.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
+        self.transaction_pool_item.addChild(item)
 
 
 class KeystoreWidget(QWidget):

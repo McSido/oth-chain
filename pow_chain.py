@@ -45,6 +45,8 @@ class PoW_Blockchain(Blockchain):
                     self.transaction_pool.remove(block_transaction)
             self.send_queue.put(('new_block', block, 'broadcast'))
             self.chain.append(block)
+            if self.gui_ready:
+                self.gui_queue.put(('new_block', block, 'local'))
         else:
             print_debug_info('Invalid block')
 
@@ -294,7 +296,8 @@ class PoW_Blockchain(Blockchain):
 
         def dump_vars(_: Any, msg_address: Address):
             if msg_address == 'gui':
-                self.gui_queue.put(self.chain, block=True)
+                self.gui_queue.put(('dump', (self.chain, self.transaction_pool), 'local'))
+                self.gui_ready = True
                 return
             if msg_address != 'local':
                 return
