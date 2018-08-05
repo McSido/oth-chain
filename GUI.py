@@ -49,6 +49,14 @@ class ChainGUI(QMainWindow):
                 self.splitter.widget(0).chain_tab.new_block(msg_data)
             elif msg_type == 'new_transaction':
                 self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
+            elif msg_type == 'dump':
+                self.splitter.widget(0).chain_tab.load_data(msg_data)
+            elif msg_type == 'active_peer':
+                self.splitter.widget(0).peers_tab.update_peers('active', msg_data)
+            elif msg_type == 'inferred_peer':
+                self.splitter.widget(0).peers_tab.update_peers('inferred', msg_data)
+            elif msg_type == 'inactive_peer':
+                self.splitter.widget(0).peers_tab.update_peers('inactive', msg_data)
 
 
 class TabWidget(QWidget):
@@ -59,7 +67,7 @@ class TabWidget(QWidget):
 
         self.tabs = QTabWidget()
         self.chain_tab = ChainHistoryWidget(self)
-        self.peers_tab = QWidget()
+        self.peers_tab = PeerWidget(self)
         self.keystore_tab = KeystoreWidget(self)
 
         self.tabs.addTab(self.chain_tab, 'Chain history')
@@ -76,7 +84,6 @@ class ChainHistoryWidget(QWidget):
         super(ChainHistoryWidget, self).__init__(parent)
         self.layout = QVBoxLayout()
         self.chain_queue = self.parent().parent().chain_queue
-        self.gui_queue = self.parent().parent().gui_queue
 
         self.history = QTreeWidget()
         self.history.setVerticalScrollBar(QScrollBar(QtCore.Qt.Vertical))
@@ -92,16 +99,15 @@ class ChainHistoryWidget(QWidget):
         self.chain = []
         self.transaction_pool = []
 
-        self.load_data()
+        self.chain_queue.put(('dump', '', 'gui'))
 
         self.setLayout(self.layout)
 
-    def load_data(self):
-        self.chain_queue.put(('dump', '', 'gui'))
-        data = self.gui_queue.get(block=True)[1]
+    def load_data(self, data: tuple):
+
         self.chain = data[0]
         self.transaction_pool = data[1]
-        print(self.chain)
+
         for block in self.chain:
             self.add_tree_item(block)
         for transaction in self.transaction_pool:
@@ -195,6 +201,65 @@ class ChainHistoryWidget(QWidget):
 
         for item in items_to_delete:
             self.transaction_pool_item.removeChild(item)
+
+
+class PeerWidget(QWidget):
+
+    def __init__(self, parent):
+        super(PeerWidget, self).__init__(parent)
+        self.layout = QVBoxLayout()
+
+        self.peers = QTreeWidget()
+        self.peers.setColumnCount(2)
+        self.active_peers = QTreeWidgetItem()
+        self.active_peers.setText(0, 'Active Peers:')
+        self.known_peers = QTreeWidgetItem()
+        self.known_peers.setText(0, 'Known Peers:')
+        self.inactive_peers = QTreeWidgetItem()
+        self.inactive_peers.setText(0, 'Inactive Peers:')
+
+        self.peers.addTopLevelItems([self.active_peers, self.known_peers, self.inactive_peers])
+
+        self.layout.addWidget(self.peers)
+
+        self.setLayout(self.layout)
+
+    def update_peers(self, typ, address):
+        if typ == 'inferred':
+            item = QTreeWidgetItem()
+            item.setText(0, 'Address:')
+            item.setText(1, f'{str(address[0])}:{str(address[1])}')
+            self.known_peers.addChild(item)
+        elif typ == 'active':
+            for i in range(self.inactive_peers.childCount()):
+                if self.inactive_peers.child(i).text(1) == f'{str(address[0])}:{str(address[1])}':
+                    item = self.inactive_peers.takeChild(i)
+                    self.active_peers.addChild(item)
+                    return
+            for i in range(self.known_peers.childCount()):
+                if self.known_peers.child(i).text(1) == f'{str(address[0])}:{str(address[1])}':
+                    item = self.known_peers.takeChild(i)
+                    self.active_peers.addChild(item)
+                    return
+            item = QTreeWidgetItem()
+            item.setText(0, 'Address')
+            item.setText(1, f'{str(address[0])}:{str(address[1])}')
+            self.active_peers.addChild(item)
+        elif typ == 'inactive':
+            for i in range(self.active_peers.childCount()):
+                if self.active_peers.child(i).text(1) == f'{str(address[0])}:{str(address[1])}':
+                    item = self.active_peers.takeChild(i)
+                    self.inactive_peers.addChild(item)
+                    return
+            for i in range(self.known_peers.childCount()):
+                if self.known_peers.child(i).text(1) == f'{str(address[0])}:{str(address[1])}':
+                    item = self.known_peers.takeChild(i)
+                    self.inactive_peers.addChild(item)
+                    return
+            item = QTreeWidgetItem()
+            item.setText(0, 'Address')
+            item.setText(1, f'{str(address[0])}:{str(address[1])}')
+            self.inactive_peers.addChild(item)
 
 
 class KeystoreWidget(QWidget):

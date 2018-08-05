@@ -148,7 +148,7 @@ def init(keystore_filename: str, port: int, signing_key):
     # Create networking thread
     networker = threading.Thread(
         target=networking.worker,
-        args=(send_queue, receive_queue, networker_command_queue, port))
+        args=(send_queue, receive_queue, networker_command_queue, gui_send_queue, port))
     networker.start()
 
     # Main blockchain loop
