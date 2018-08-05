@@ -1,7 +1,15 @@
+import hashlib
 import sys
 import threading
 import time
-from keystore import Keystore
+
+import math
+
+import nacl.encoding
+import nacl.signing
+import nacl.utils
+
+from keystore import Keystore, load_key, save_key
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import *
@@ -47,16 +55,22 @@ class ChainGUI(QMainWindow):
             msg_type, msg_data, msg_address = self.gui_queue.get(block=True)
             if msg_type == 'new_block':
                 self.splitter.widget(0).chain_tab.new_block(msg_data)
+                self.splitter.widget(1).request_balance()
             elif msg_type == 'new_transaction':
                 self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
             elif msg_type == 'dump':
                 self.splitter.widget(0).chain_tab.load_data(msg_data)
+                self.splitter.widget(1).request_balance()
             elif msg_type == 'active_peer':
                 self.splitter.widget(0).peers_tab.update_peers('active', msg_data)
             elif msg_type == 'inferred_peer':
                 self.splitter.widget(0).peers_tab.update_peers('inferred', msg_data)
             elif msg_type == 'inactive_peer':
                 self.splitter.widget(0).peers_tab.update_peers('inactive', msg_data)
+            elif msg_type == 'signing_key':
+                self.splitter.widget(1).update_signing_key(msg_data)
+            elif msg_type == 'balance':
+                self.splitter.widget(1).update_balance(msg_data)
 
 
 class TabWidget(QWidget):
@@ -179,7 +193,7 @@ class ChainHistoryWidget(QWidget):
         t_timestamp = QTreeWidgetItem()
         t_timestamp.setText(0, 'Timestamp:')
         t_timestamp.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
-                                               time.gmtime(transaction.timestamp))))
+                                                 time.gmtime(transaction.timestamp))))
         signature = QTreeWidgetItem()
         signature.setText(0, 'Signature')
         signature.setText(1, str(transaction.signature))
@@ -357,7 +371,11 @@ class TransactionWidget(QWidget):
 
     def __init__(self, parent: QWidget):
         super(TransactionWidget, self).__init__(parent)
+        self.chain_queue = self.parent().chain_queue
+        self.keystore = self.parent().keystore
         self.layout = QVBoxLayout(self)
+        self.signing_key = None
+        self.verify_key_hex = None
 
         self.user_group_box = QGroupBox()
 
@@ -365,6 +383,7 @@ class TransactionWidget(QWidget):
         self.user_group_box_form = QFormLayout()
 
         self.load_key_button = QPushButton('Load private Key')
+        self.load_key_button.clicked.connect(self.load_signing_key)
         self.export_key_button = QPushButton('Export public Key')
         user_hbox = QHBoxLayout()
         self.user_field = QLineEdit()
@@ -376,6 +395,10 @@ class TransactionWidget(QWidget):
 
         self.user_group_box_form.addRow(QLabel('User:'), user_hbox)
 
+        self.mine_button = QPushButton('Start Mining')
+        self.mine_button.clicked.connect(self.mine)
+        self.user_group_box_form.addRow(QLabel(), self.mine_button)
+
         self.user_group_box_layout.addLayout(self.user_group_box_form)
         self.user_group_box.setLayout(self.user_group_box_layout)
         self.layout.addWidget(self.user_group_box)
@@ -386,18 +409,104 @@ class TransactionWidget(QWidget):
         self.transaction_group_box_form = QFormLayout()
 
         self.transaction_group_box_form.addRow(QLabel('New Transaction:'))
+        self.balance_label = QLabel('Current Balance: 0')
+        self.transaction_group_box_form.addRow(self.balance_label)
         self.recipient_edit = QLineEdit()
         self.recipient_edit.setPlaceholderText('Recipient')
         self.amount_edit = QSpinBox()
-        self.amount_edit.setMaximum(9999)
+        self.amount_edit.valueChanged.connect(self.update_fee)
+
         self.send_button = QPushButton('Send')
+        self.send_button.clicked.connect(self.send_transaction)
+
+        self.fee_label = QLabel('Fee: 1')
+        transaction_hbox = QHBoxLayout()
+        transaction_hbox.addWidget(self.amount_edit)
+        transaction_hbox.addWidget(self.fee_label)
+
+        self.amount_edit.setMinimum(1)
+        self.amount_edit.setMaximum(9999)
 
         self.transaction_group_box_form.addRow(QLabel(), self.recipient_edit)
-        self.transaction_group_box_form.addRow(QLabel('Amount'), self.amount_edit)
+        self.transaction_group_box_form.addRow(QLabel('Amount'), transaction_hbox)
         self.transaction_group_box_form.addRow(QLabel(), self.send_button)
 
         self.transaction_group_box_layout.addLayout(self.transaction_group_box_form)
         self.transaction_group_box.setLayout(self.transaction_group_box_layout)
         self.layout.addWidget(self.transaction_group_box)
 
+        self.error_label = QLabel()
+        self.error_label.hide()
+        self.transaction_group_box_form.addRow(self.error_label)
+
         self.setLayout(self.layout)
+
+    def mine(self):
+        pass
+
+    def update_fee(self):
+        fee = math.ceil(self.amount_edit.value() * 0.05)
+        self.fee_label.setText(f'Fee: {fee}')
+
+    def send_transaction(self):
+        self.error_label.hide()
+        recipient = self.keystore.resolve_name(self.recipient_edit.text())
+        if recipient == 'Error':
+            self.error_label.setText('Error: Recipient name could not be found in the keystore!')
+            self.error_label.show()
+            return
+        timestamp = time.time()
+        # fee equals 5% of the transaction amount - at least 1
+        amount = self.amount_edit.value()
+        fee = math.ceil(amount * 0.05)
+        if amount + fee > int(self.balance_label.text().split(': ')[1]):
+            self.error_label.setText('Error: Current balance is not sufficient for this transaction!')
+            self.error_label.show()
+            return
+        transaction_hash = hashlib. \
+            sha256((str(self.verify_key_hex) +
+                    str(recipient) + str(amount)
+                    + str(fee) +
+                    str(timestamp)).encode()).hexdigest()
+
+        self.chain_queue.put(('new_transaction',
+                              Transaction(self.verify_key_hex,
+                                          recipient,
+                                          amount,
+                                          fee,
+                                          timestamp,
+                                          self.signing_key.sign(
+                                              transaction_hash.encode())
+                                          ),
+                              'gui'
+                              ))
+
+    def load_signing_key(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        file_name, _ = QFileDialog.getOpenFileName(self, 'Select key file', '',
+                                                   'All Files (*);;', options=options)
+        if not file_name:
+            return
+        key = load_key(file_name)
+        self.update_signing_key(key)
+
+    def save_signing_key(self):
+        pass
+
+    def export_verify_key(self):
+        pass
+
+    def update_signing_key(self, key: nacl.signing.SigningKey):
+        self.signing_key = key
+        verify_key = self.signing_key.verify_key
+        self.verify_key_hex = verify_key.encode(nacl.encoding.HexEncoder)
+        self.user_field.setText(str(self.verify_key_hex))
+
+    def update_balance(self, balance: int):
+        self.balance_label.setText(f'Current Balance: {balance}')
+
+    def request_balance(self):
+        self.chain_queue.put(('print_balance',
+                              (self.verify_key_hex, time.time()),
+                              'gui'))

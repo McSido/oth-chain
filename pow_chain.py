@@ -284,10 +284,14 @@ class PoW_Blockchain(Blockchain):
             assert all(isinstance(block, Block) for block in msg_data)
             self.resolve_conflict(msg_data)
 
-        def print_balance(msg_data: Any, _: Address):
-            print(
-                'Current Balance: ' +
-                f'{self.check_balance(msg_data[0], msg_data[1])}')
+        def print_balance(msg_data: Any, msg_address: Address):
+            balance = self.check_balance(msg_data[0], msg_data[1])
+            if msg_address == 'gui':
+                self.gui_queue.put(('balance', balance, 'local'))
+            else:
+                print(
+                    'Current Balance: ' +
+                    f'{balance}')
 
         def save_chain(_: Any, msg_address: Address):
             if msg_address != 'local':

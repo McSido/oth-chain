@@ -340,6 +340,7 @@ keystore
         elif command == 'gui':
             print("open gui")
             gui_thread.start()
+            gui_send_queue.put(('signing_key', signing_key, 'local'))
 
         else:
             print('Command not found!')
