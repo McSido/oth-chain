@@ -47,9 +47,20 @@ class TestPOW():
 
         block.transactions.append(mining_transaction)
 
-        self.blockchain.new_block(block)
+        root_hash = self.blockchain.create_merkle_root(block.transactions)
+        real_header = pow_chain.Header(
+            block.header.version,
+            block.header.index,
+            block.header.timestamp,
+            block.header.previous_hash,
+            root_hash,
+            block.header.proof
+        )
+        real_block = pow_chain.Block(real_header, block.transactions)
 
-        assert self.blockchain.latest_block() == block
+        self.blockchain.new_block(real_block)
+
+        assert self.blockchain.latest_block() == real_block
         assert (mining_transaction in
                 self.blockchain.latest_block().transactions)
         assert self.blockchain.check_balance(
@@ -143,7 +154,19 @@ class TestPOW():
                                   fee=0,
                                   timestamp=time.time(),
                                   signature='0'))
-        self.blockchain.new_block(block)
+
+        root_hash = self.blockchain.create_merkle_root(block.transactions)
+        real_header = pow_chain.Header(
+            block.header.version,
+            block.header.index,
+            block.header.timestamp,
+            block.header.previous_hash,
+            root_hash,
+            block.header.proof
+        )
+        real_block = pow_chain.Block(real_header, block.transactions)
+
+        self.blockchain.new_block(real_block)
         self.sends.get(timeout=1)  # Remove new_block message
 
     def create_transaction(self):

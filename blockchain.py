@@ -3,13 +3,14 @@
 import hashlib
 import os
 import pickle
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict, namedtuple
 from pathlib import Path
 from pprint import pprint
 from queue import Queue
 from time import time
 from typing import Any, Callable, List
 
+from networking import Address
 from utils import print_debug_info
 
 Transaction = namedtuple('Transaction',
@@ -42,6 +43,7 @@ class Blockchain(object):
 
     def __init__(self, version: float, send_queue: Queue) -> None:
         self.chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
+        self.new_chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
         self.transaction_pool: List[Transaction] = []
         self.send_queue = send_queue
         self.load_chain()
@@ -126,23 +128,33 @@ class Blockchain(object):
         Args:
             block: The block to be added to the chain.
         """
-        if block.header.index > self.latest_block().header.index + 1:
-            # block higher then current chain:
-            # resolve conflict between chains
-            self.send_queue.put(('get_chain', '', 'broadcast'))
-            print_debug_info('Chain out-of-date.')
-            print_debug_info('Updating...')
-            return
 
-        if self.validate_block(block, self.latest_block()):
-            # remove transactions in new block from own transaction pool
-            for block_transaction in block.transactions:
-                if block_transaction in self.transaction_pool:
-                    self.transaction_pool.remove(block_transaction)
-            self.send_queue.put(('new_block', block, 'broadcast'))
-            self.chain[block.header] = block.transactions
-        else:
-            print_debug_info('Invalid block')
+        # Check current chain
+
+        if block.header.index == self.latest_block().header.index + 1:
+            if self.validate_block(block, self.latest_block()):
+                # remove transactions in new block from own transaction pool
+                for block_transaction in block.transactions:
+                    if block_transaction in self.transaction_pool:
+                        self.transaction_pool.remove(block_transaction)
+                self.send_queue.put(('new_header', block.header, 'broadcast'))
+                self.chain[block.header] = block.transactions
+            else:
+                print_debug_info('Block not for current chain')
+
+        if block.header in self.new_chain:
+            if self.validate_block(block, self.nc_latest_block()):
+                self.new_chain[block.header] = block.transactions
+
+                # Check if new chain is finished
+                if not any(t is None for t in self.new_chain.values()):
+                    self.send_queue.put(
+                        ('new_header', self.nc_latest_header(), 'broadcast'))
+                    self.chain = OrderedDict(self.new_chain)
+                    self.new_chain.clear()
+
+            else:
+                print_debug_info('Block not for new chain')
 
     def new_header(self, header: Header):
         """ Check if new header is valid and ask for the corresponding block
@@ -233,7 +245,7 @@ class Blockchain(object):
         """
         raise NotImplementedError
 
-    def resolve_conflict(self, new_chain: List[Block]):
+    def resolve_conflict(self, new_chain: List[Header]):
         """ Resolve conflict between to blockchains/forks.
 
         Abstract function!
@@ -264,6 +276,23 @@ class Blockchain(object):
         """
         return next(reversed(self.chain))
 
+    def nc_latest_block(self) -> Block:
+        """ Get the latest block of the new chain.
+
+        Returns:
+            The latest block on the new chain.
+        """
+        return Block(self.nc_latest_header(),
+                     self.new_chain[self.nc_latest_header()])
+
+    def nc_latest_header(self) -> Header:
+        """ Get the latest block-header of the new chain.
+
+        Returns:
+            The header of the latest block on the new chain.
+        """
+        return next(reversed(self.new_chain))
+
     def get_header_chain(self) -> List[Header]:
         """ Get all the headers of the current chain
 
@@ -279,6 +308,26 @@ class Blockchain(object):
             The blocks in the blockchain (in order)
         """
         return [Block(h, t) for h, t in self.chain.items()]
+
+    def get_block(self, header: Header) -> Block:
+        """ Get the block corresponding to the header
+
+        Args:
+            header: Header of the block
+
+        Returns:
+            The block corresponding to the header
+        """
+        return Block(header, self.chain[header])
+
+    def send_block(self, header: Header, address: Address):
+        """ Send block corresponding to the header to the address
+
+        Args:
+            header: Header of the block
+            address: Address of the receiver
+        """
+        self.send_queue.put(('new_block', self.get_block(header), address))
 
     @staticmethod
     def create_merkle_root(transactions: List[Transaction]) -> str:

@@ -55,12 +55,11 @@ def receive_msg(msg_type: str, msg_data: Any, msg_address: Address,
     """
 
     if msg_type == 'get_newest_block':
-        block = blockchain.latest_block()
-        send_queue.put(('new_block', block, msg_address))
+        header = blockchain.latest_header()
+        send_queue.put(('new_header', header, msg_address))
     elif msg_type == 'get_chain':
-        # Change data to headers only
         send_queue.put(
-            ('resolve_conflict', blockchain.get_block_chain(), msg_address))
+            ('resolve_conflict', blockchain.get_header_chain(), msg_address))
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
     else:

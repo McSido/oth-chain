@@ -68,6 +68,11 @@ class PoW_Blockchain(Blockchain):
         if not self.validate_header(block.header, last_block.header):
             return False
 
+        # Check if hash is valid
+        if not self.create_merkle_root(block.transactions) ==\
+                block.header.root_hash:
+            return False
+
         # check if the proof of the new block is valid
         mining_transaction = None
         mining_transaction_found = False
@@ -194,7 +199,7 @@ class PoW_Blockchain(Blockchain):
         test_hash = self.hash(test_proof)
         return test_hash[:difficulty] == '0' * difficulty
 
-    def resolve_conflict(self, new_chain: List[Block]):
+    def resolve_conflict(self, new_chain: List[Header]):
         """ Resolves any conflicts that occur with different/outdated chains.
 
         Conflicts are resolved by accepting the longest valid chain.
@@ -205,25 +210,39 @@ class PoW_Blockchain(Blockchain):
         """
         print_debug_info('Resolving conflict')
         if len(self.chain) < len(new_chain):
-            # Validate new chain:
-            # store old chain, and set self.chain to new_chain
-            # (needed for check_balance)
-            old_chain = OrderedDict(self.chain)
-            self.chain.clear()
-            for block in new_chain:
-                self.chain[block.header] = block.transactions
+            if len(self.new_chain) < len(new_chain):
+                # Validate new_chain
+                old_header = new_chain[0]
+                for header in new_chain[1:]:
+                    if self.validate_header(header, old_header):
+                        old_header = header
+                    else:
+                        print_debug_info('Conflict resolved (old chain)')
+                        return
 
-            t_header = next(self.chain)
-            old_block = Block(t_header, self.chain[t_header])
-            for h, t in self.chain.items():
-                if h == old_block.header:
-                    continue  # Ignore first block
-                if not self.validate_block(Block(h, t), old_block):
-                    print_debug_info('Conflict resolved (old chain)')
-                    self.chain = old_chain
-                    return
-                old_block = Block(h, t)
-            print_debug_info('Conflict resolved (new chain)')
+                # Create blockchain from new_chain
+                new_bchain: OrderedDict[Header, List[Transaction]] = \
+                    OrderedDict([(h, None) for h in new_chain])
+
+                # Add known blocks
+                for h, t in self.chain.items():
+                    if h in new_bchain:
+                        new_bchain[h] = t
+                    else:
+                        break  # Can't be missing blocks in main chain
+
+                for h, t in self.new_chain.items():
+                    if h in new_bchain:
+                        new_bchain[h] = t
+
+                self.new_chain = new_bchain
+                print_debug_info('Conflict (Header) resolved (new chain)')
+
+                # Ask for missing blocks
+                for h, t in self.new_chain.items():
+                    if t is None:
+                        self.send_queue.put(('get_block', h, 'broadcast'))
+
         else:
             print_debug_info('Conflict resolved (old chain)')
 
@@ -279,11 +298,22 @@ class PoW_Blockchain(Blockchain):
                 Transaction(sender='0', recipient=msg_data,
                             amount=mining_reward + fee_sum, fee=0,
                             timestamp=time.time(), signature='0'))
-            self.new_block(block)
+
+            root_hash = self.create_merkle_root(block.transactions)
+            real_header = Header(
+                block.header.version,
+                block.header.index,
+                block.header.timestamp,
+                block.header.previous_hash,
+                root_hash,
+                block.header.proof
+            )
+            real_block = Block(real_header, block.transactions)
+            self.new_block(real_block)
 
         def resolve_conflict_inner(msg_data: Any, _: Address):
             assert isinstance(msg_data, list)
-            assert all(isinstance(block, Block) for block in msg_data)
+            assert all(isinstance(header, Header) for header in msg_data)
             self.resolve_conflict(msg_data)
 
         def print_balance(msg_data: Any, _: Address):
@@ -301,6 +331,14 @@ class PoW_Blockchain(Blockchain):
                 return
             pprint(vars(self))
 
+        def get_block_inner(msg_data: Any, msg_address: Address):
+            assert isinstance(msg_data, Header)
+            self.send_block(msg_data, msg_address)
+
+        def new_header_inner(msg_data: Any, _: Address):
+            assert isinstance(msg_data, Header)
+            self.new_header(msg_data)
+
         commands: Dict[str, Callable[[Any, Address], Any]] = {
             'new_block': new_block_inner,
             'new_transaction': new_transaction_inner,
@@ -309,6 +347,8 @@ class PoW_Blockchain(Blockchain):
             'print_balance': print_balance,
             'save': save_chain,
             'dump': dump_vars,
+            'get_block': get_block_inner,
+            'new_header': new_header_inner
         }
 
         def processor(msg_type: str, msg_data: Any,
