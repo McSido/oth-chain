@@ -385,15 +385,20 @@ class TransactionWidget(QWidget):
         self.load_key_button = QPushButton('Load private Key')
         self.load_key_button.clicked.connect(self.load_signing_key)
         self.export_key_button = QPushButton('Export public Key')
-        user_hbox = QHBoxLayout()
+        key_hbox = QHBoxLayout()
         self.user_field = QLineEdit()
         self.user_field.setEnabled(False)
         self.user_field.setPlaceholderText('Key')
-        user_hbox.addWidget(self.user_field)
-        user_hbox.addWidget(self.load_key_button)
-        user_hbox.addWidget(self.export_key_button)
+        self.save_key_button = QPushButton('Save private Key')
+        key_hbox.addWidget(self.save_key_button)
+        key_hbox.addWidget(self.load_key_button)
+        key_hbox.addWidget(self.export_key_button)
 
-        self.user_group_box_form.addRow(QLabel('User:'), user_hbox)
+        self.save_key_button.clicked.connect(self.save_signing_key)
+        self.export_key_button.clicked.connect(self.export_verify_key)
+
+        self.user_group_box_form.addRow(QLabel('User:'), self.user_field)
+        self.user_group_box_form.addRow(key_hbox)
 
         self.mine_button = QPushButton('Start Mining')
         self.mine_button.clicked.connect(self.mine)
@@ -442,7 +447,7 @@ class TransactionWidget(QWidget):
         self.setLayout(self.layout)
 
     def mine(self):
-        pass
+        self.chain_queue.put(('mine', self.verify_key_hex, 'local'))
 
     def update_fee(self):
         fee = math.ceil(self.amount_edit.value() * 0.05)
@@ -492,10 +497,22 @@ class TransactionWidget(QWidget):
         self.update_signing_key(key)
 
     def save_signing_key(self):
-        pass
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        file_name, _ = QFileDialog.getSaveFileName(self, 'Save key file', '',
+                                                   'All Files (*);;', options=options)
+        if not file_name:
+            return
+        save_key(self.signing_key, file_name)
 
     def export_verify_key(self):
-        pass
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        file_name, _ = QFileDialog.getSaveFileName(self, 'Save key file', '',
+                                                   'All Files (*);;', options=options)
+        if not file_name:
+            return
+        save_key(self.verify_key_hex, file_name)
 
     def update_signing_key(self, key: nacl.signing.SigningKey):
         self.signing_key = key
