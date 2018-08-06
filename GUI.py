@@ -42,6 +42,7 @@ class ChainGUI(QMainWindow):
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
         self.setWindowTitle('OTH-Chain')
+        self.setGeometry(500, 200, 1000, 500)
         self.show()
 
         message_thread = threading.Thread(
@@ -103,6 +104,7 @@ class ChainHistoryWidget(QWidget):
         self.history.setVerticalScrollBar(QScrollBar(QtCore.Qt.Vertical))
         self.history.setHorizontalScrollBar(QScrollBar(QtCore.Qt.Horizontal))
         self.history.setColumnCount(2)
+        self.history.setColumnWidth(0, 200)
 
         self.layout.addWidget(self.history)
 
@@ -225,6 +227,7 @@ class PeerWidget(QWidget):
 
         self.peers = QTreeWidget()
         self.peers.setColumnCount(2)
+        self.peers.setColumnWidth(0, 200)
         self.active_peers = QTreeWidgetItem()
         self.active_peers.setText(0, 'Active Peers:')
         self.known_peers = QTreeWidgetItem()
@@ -402,7 +405,7 @@ class TransactionWidget(QWidget):
 
         self.mine_button = QPushButton('Start Mining')
         self.mine_button.clicked.connect(self.mine)
-        self.user_group_box_form.addRow(QLabel(), self.mine_button)
+        self.user_group_box_form.addRow(self.mine_button)
 
         self.user_group_box_layout.addLayout(self.user_group_box_form)
         self.user_group_box.setLayout(self.user_group_box_layout)
