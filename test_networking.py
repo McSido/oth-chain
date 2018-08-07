@@ -15,7 +15,7 @@ def setup():
     """ Setup RECEIVER for tests.
     """
     RECEIVER.setup(6667)
-    networking.PEERS.setup(Queue(), 6667)
+    networking.PEERS.setup(Queue(), Queue(), 6667)
 
 
 def teardown():

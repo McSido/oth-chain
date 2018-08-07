@@ -16,9 +16,10 @@ class TestPeers():
         """ Setup PeerMananger for the tests.
         """
         self.send_queue = Queue()
+        self.gui_qeueue = Queue()
         self.peers = PeerManager()
 
-        self.peers.setup(self.send_queue, 1234)
+        self.peers.setup(self.send_queue, self.gui_qeueue, 1234)
 
         while not self.send_queue.empty():
             self.send_queue.get_nowait()
