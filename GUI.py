@@ -8,13 +8,12 @@ import math
 import nacl.encoding
 import nacl.signing
 import nacl.utils
-from qtpy import QtGui
 
 from keystore import Keystore, load_key, save_key
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import *
-from PyQt5 import QtCore
+from PyQt5 import QtCore, QtGui
 from queue import Queue
 from blockchain import Block, Transaction
 
