@@ -8,6 +8,7 @@ import math
 import nacl.encoding
 import nacl.signing
 import nacl.utils
+from qtpy import QtGui
 
 from keystore import Keystore, load_key, save_key
 
@@ -18,10 +19,10 @@ from queue import Queue
 from blockchain import Block, Transaction
 
 
-def gui_loop(gui_queue: Queue, chain_queue: Queue, keystore: Keystore):
+def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keystore):
     app = QApplication(sys.argv)
     ex = ChainGUI(keystore)
-    ex.initUI(chain_queue, gui_queue)
+    ex.initUI(chain_queue, gui_queue, command_queue)
 
     sys.exit(app.exec_())
 
@@ -34,10 +35,11 @@ class ChainGUI(QMainWindow):
         self.lineHistoryCounter = len(self.lineEditHistory)
         self.keystore = keystore
 
-    def initUI(self, chain_queue: Queue, gui_queue: Queue):
+    def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
         self.splitter = QSplitter()
         self.chain_queue = chain_queue
         self.gui_queue = gui_queue
+        self.command_queue = command_queue
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
@@ -72,6 +74,10 @@ class ChainGUI(QMainWindow):
                 self.splitter.widget(1).update_signing_key(msg_data)
             elif msg_type == 'balance':
                 self.splitter.widget(1).update_balance(msg_data)
+
+    def closeEvent(self, a0: QtGui.QCloseEvent):
+        self.command_queue.put('exit')
+        a0.accept()
 
 
 class TabWidget(QWidget):

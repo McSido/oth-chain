@@ -176,7 +176,7 @@ def init(keystore_filename: str, port: int, signing_key):
     # gui thread
     gui_thread = threading.Thread(
         target=gui_loop,
-        args=(gui_send_queue, receive_queue, keystore), )  # daemon=True
+        args=(gui_send_queue, receive_queue, gui_receive_queue, keystore), )  # daemon=True
 
     return keystore, signing_key, verify_key_hex, networker, \
         blockchain_thread, gui_thread
@@ -242,6 +242,8 @@ keystore
             keystore.save()
             blockchain_thread.join()
             networker.join()
+            if gui_thread.is_alive():
+                gui_thread.join()
             sys.exit()
         elif command == 'mine':
             receive_queue.put(('mine', verify_key_hex, 'local'))
