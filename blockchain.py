@@ -27,10 +27,12 @@ class Blockchain(object):
         send_queue: Queue for messages to other nodes
     """
 
-    def __init__(self, send_queue: Queue) -> None:
+    def __init__(self, send_queue: Queue, gui_queue: Queue) -> None:
         self.chain: List[Block] = []
         self.transaction_pool: List[Transaction] = []
         self.send_queue = send_queue
+        self.gui_ready = False
+        self.gui_queue = gui_queue
         self.load_chain()
 
     def check_balance(self, key: bytes, timestamp: float) -> int:
@@ -102,6 +104,8 @@ class Blockchain(object):
         if self.validate_transaction(transaction):
             self.transaction_pool.append(transaction)
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
+            if self.gui_ready:
+                self.gui_queue.put(('new_transaction', transaction, 'local'))
         else:
             print_debug_info('Invalid transaction')
 

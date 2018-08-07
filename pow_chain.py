@@ -21,6 +21,7 @@ class PoW_Blockchain(Blockchain):
 
     Args:
         send_queue: Queue for messages to other nodes.
+        gui_queue: Queue for interaction with the gui.
     """
 
     def new_block(self, block: Block):
@@ -44,6 +45,8 @@ class PoW_Blockchain(Blockchain):
                     self.transaction_pool.remove(block_transaction)
             self.send_queue.put(('new_block', block, 'broadcast'))
             self.chain.append(block)
+            if self.gui_ready:
+                self.gui_queue.put(('new_block', block, 'local'))
         else:
             print_debug_info('Invalid block')
 
@@ -281,10 +284,14 @@ class PoW_Blockchain(Blockchain):
             assert all(isinstance(block, Block) for block in msg_data)
             self.resolve_conflict(msg_data)
 
-        def print_balance(msg_data: Any, _: Address):
-            print(
-                'Current Balance: ' +
-                f'{self.check_balance(msg_data[0], msg_data[1])}')
+        def print_balance(msg_data: Any, msg_address: Address):
+            balance = self.check_balance(msg_data[0], msg_data[1])
+            if msg_address == 'gui':
+                self.gui_queue.put(('balance', balance, 'local'))
+            else:
+                print(
+                    'Current Balance: ' +
+                    f'{balance}')
 
         def save_chain(_: Any, msg_address: Address):
             if msg_address != 'local':
@@ -292,6 +299,10 @@ class PoW_Blockchain(Blockchain):
             self.save_chain()
 
         def dump_vars(_: Any, msg_address: Address):
+            if msg_address == 'gui':
+                self.gui_queue.put(('dump', (self.chain, self.transaction_pool), 'local'))
+                self.gui_ready = True
+                return
             if msg_address != 'local':
                 return
             pprint(vars(self))

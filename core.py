@@ -23,7 +23,7 @@ import networking
 from networking import Address
 from blockchain import Blockchain
 from GUI import *
-from keystore import Keystore
+from keystore import Keystore, load_key, save_key
 from pow_chain import PoW_Blockchain, Transaction
 from utils import print_debug_info, set_debug
 
@@ -74,7 +74,7 @@ def blockchain_loop(blockchain: Blockchain, processor):
 
     Args:
         blockchain: The blockchain upon which to operate.
-        processer: Processer used to handle blockchain messages.
+        processor: Processor used to handle blockchain messages.
     """
     while True:
         msg_type, msg_data, msg_address = receive_queue.get()
@@ -86,27 +86,6 @@ def blockchain_loop(blockchain: Blockchain, processor):
                 f'Assertion Error on message\
                  {msg_type}:{msg_data}:{msg_address}')
             print_debug_info(e)
-
-
-def load_key(filename):
-    """ Attempts to load a key from the provided file.
-
-    Args:
-        filename: Specifies the key file.
-    """
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
-
-
-def save_key(key, filename):
-    """ Attempts to save the provided key to the provided file.
-
-    Args:
-        key: The key to be saved.
-        filename: The filename of the saved key.
-    """
-    with open(filename, 'wb') as f:
-        pickle.dump(key, f)
 
 
 def parse_args(argv):
@@ -163,13 +142,13 @@ def init(keystore_filename: str, port: int, signing_key):
         signing_key: Key of the current user
     """
     # Create proof-of-work blockchain
-    my_blockchain = PoW_Blockchain(send_queue)
+    my_blockchain = PoW_Blockchain(send_queue, gui_send_queue)
     my_blockchain_processor = my_blockchain.process_message()
 
     # Create networking thread
     networker = threading.Thread(
         target=networking.worker,
-        args=(send_queue, receive_queue, networker_command_queue, port))
+        args=(send_queue, receive_queue, networker_command_queue, gui_send_queue, port))
     networker.start()
 
     # Main blockchain loop
@@ -178,10 +157,7 @@ def init(keystore_filename: str, port: int, signing_key):
         args=(my_blockchain, my_blockchain_processor))
     blockchain_thread.start()
 
-    # gui thread
-    gui_thread = threading.Thread(
-        target=gui_loop,
-        args=(gui_send_queue, gui_receive_queue), )  # daemon=True
+
 
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
@@ -196,6 +172,11 @@ def init(keystore_filename: str, port: int, signing_key):
 
     # Initialize Keystore
     keystore = Keystore(keystore_filename)
+
+    # gui thread
+    gui_thread = threading.Thread(
+        target=gui_loop,
+        args=(gui_send_queue, receive_queue, gui_receive_queue, keystore), )  # daemon=True
 
     return keystore, signing_key, verify_key_hex, networker, \
         blockchain_thread, gui_thread
@@ -212,9 +193,6 @@ def main(argv):
     keystore, signing_key, verify_key_hex, networker, \
         blockchain_thread, gui_thread = init(
             *parse_args(argv))
-
-    # Initialize CLI
-    command_line_interface = cli.CLI()
 
     # User Interaction
     while True:
@@ -237,7 +215,7 @@ def main(argv):
         command = command.lower().strip()
         command = re.sub(r'\s\s*', ' ', command)
 
-        gui_send_queue.put(command)
+        # gui_send_queue.put(command)
         if command == 'help':
             help_str = (""" Available commands:
                 help: prints commands
@@ -264,6 +242,8 @@ keystore
             keystore.save()
             blockchain_thread.join()
             networker.join()
+            if gui_thread.is_alive():
+                gui_thread.join()
             sys.exit()
         elif command == 'mine':
             receive_queue.put(('mine', verify_key_hex, 'local'))
@@ -315,10 +295,10 @@ keystore
             try:
                 t = command.split(' ')
                 if keystore.resolve_name(t[2]):
-                    keystore.update_key(t[2], load_key(t[1]))
+                    keystore.update_key(t[2], t[1])
                 else:
                     print('importing public key')
-                    keystore.add_key(t[1], load_key(t[1]))
+                    keystore.add_key(t[2], t[1])
             except Exception as e:
                 print('Could not import key')
                 print(e)
@@ -362,6 +342,7 @@ keystore
         elif command == 'gui':
             print("open gui")
             gui_thread.start()
+            gui_send_queue.put(('signing_key', signing_key, 'local'))
 
         else:
             print('Command not found!')

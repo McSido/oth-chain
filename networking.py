@@ -164,6 +164,7 @@ def example_worker(send_queue: Queue,
 def worker(send_queue: Queue,
            receive_queue: Queue,
            command_queue: Queue,
+           gui_queue: Queue,
            port: int = 6666):
     """ Takes care of the communication between nodes.
 
@@ -181,6 +182,6 @@ def worker(send_queue: Queue,
     #   -- Blockchain message: put on receive_queue
 
     SERVER.setup(port)
-    PEERS.setup(send_queue, port)
+    PEERS.setup(send_queue, gui_queue, port)
 
     example_worker(send_queue, receive_queue, command_queue)
