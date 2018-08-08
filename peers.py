@@ -10,7 +10,7 @@ from queue import Queue
 Address = Tuple[str, int]
 
 
-class PeerManager():
+class PeerManager(object):
     """ PeerManager that handles all aspects of the Peer2Peer connections.
 
     Call setup() before use.
@@ -22,17 +22,20 @@ class PeerManager():
         self._active_peers = set()
         self._self_addresses = set()
         self._send_queue = None
+        self._gui_queue = None
 
-    def setup(self, send_queue: Queue, port: int):
+    def setup(self, send_queue: Queue, gui_queue: Queue, port: int):
         """ Setup PeerManager.
 
         Loads initial peers from peers.cfg, creates the file if needed.
 
         Args:
             send_queue: Queue for messaging other nodes.
+            gui_queue: Queue for interaction with the GUI
             port: Port of the node.
         """
         self._send_queue = send_queue
+        self._gui_queue = gui_queue
         self._init_peers(port)
 
     def _init_peers(self, port: int):
@@ -90,9 +93,10 @@ class PeerManager():
 
         for addr in to_remove:
             self._active_peers.discard(addr)
+            self._gui_queue.put(('inactive_peer', addr, 'local'))
 
     def get_broadcast_peers(self) -> Set[Address]:
-        """ Get the peers that sould receive broadcast messages.
+        """ Get the peers that should receive broadcast messages.
 
         Returns:
             List of addresses for broadcast use.
@@ -118,6 +122,7 @@ class PeerManager():
         if address not in self._peer_list:
             self._peer_list.add(address)
             self._send_queue.put(('N_ping', '', address))
+            self._gui_queue.put(('inferred_peer', address, 'local'))
 
     def peer_seen(self, address: Address):
         """ Add new seen/active peer
@@ -135,6 +140,7 @@ class PeerManager():
         if address not in self._active_peers:
             self._peer_list.add(address)
             self._active_peers.add(address)
+            self._gui_queue.put(('active_peer', address, 'local'))
             self._send_queue.put(('N_get_peers', '', address))
 
         self._last_seen[address] = time.time()

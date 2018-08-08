@@ -42,11 +42,13 @@ class Blockchain(object):
         send_queue: Queue for messages to other nodes
     """
 
-    def __init__(self, version: float, send_queue: Queue) -> None:
+    def __init__(self, version: float, send_queue: Queue, gui_queue: Queue) -> None:
         self.chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
         self.new_chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
         self.transaction_pool: List[Transaction] = []
         self.send_queue = send_queue
+        self.gui_ready = False
+        self.gui_queue = gui_queue
         self.load_chain()
         self.version = version
 
@@ -120,6 +122,8 @@ class Blockchain(object):
         if self.validate_transaction(transaction):
             self.transaction_pool.append(transaction)
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
+            if self.gui_ready:
+                self.gui_queue.put(('new_transaction', transaction, 'local'))
         else:
             print_debug_info('Invalid transaction')
 
@@ -140,6 +144,8 @@ class Blockchain(object):
                         self.transaction_pool.remove(block_transaction)
                 self.send_queue.put(('new_header', block.header, 'broadcast'))
                 self.chain[block.header] = block.transactions
+                if self.gui_ready:
+                    self.gui_queue.put(('new_block', block, 'local'))
             else:
                 print_debug_info('Block not for current chain')
 

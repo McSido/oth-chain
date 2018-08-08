@@ -21,6 +21,7 @@ class TestCore():
         self.chain = self.test_obj.blockchain
         self.processor = self.chain.process_message()
         self.chain.send_queue = core.send_queue
+        self.chain.gui_queue = core.gui_send_queue
         self.address = ('0.0.0.0', '2323')
 
     def test_new_block(self):

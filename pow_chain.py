@@ -22,6 +22,7 @@ class PoW_Blockchain(Blockchain):
 
     Args:
         send_queue: Queue for messages to other nodes.
+        gui_queue: Queue for interaction with the gui.
     """
 
     def validate_header(self, header: Header, last_header: Header) -> bool:
@@ -48,6 +49,7 @@ class PoW_Blockchain(Blockchain):
             return False
 
         return True
+
 
     def validate_block(self, block: Block, last_block: Block) -> bool:
         """ Validates a provided block.
@@ -316,10 +318,14 @@ class PoW_Blockchain(Blockchain):
             assert all(isinstance(header, Header) for header in msg_data)
             self.resolve_conflict(msg_data)
 
-        def print_balance(msg_data: Any, _: Address):
-            print(
-                'Current Balance: ' +
-                f'{self.check_balance(msg_data[0], msg_data[1])}')
+        def print_balance(msg_data: Any, msg_address: Address):
+            balance = self.check_balance(msg_data[0], msg_data[1])
+            if msg_address == 'gui':
+                self.gui_queue.put(('balance', balance, 'local'))
+            else:
+                print(
+                    'Current Balance: ' +
+                    f'{balance}')
 
         def save_chain(_: Any, msg_address: Address):
             if msg_address != 'local':
@@ -327,6 +333,10 @@ class PoW_Blockchain(Blockchain):
             self.save_chain()
 
         def dump_vars(_: Any, msg_address: Address):
+            if msg_address == 'gui':
+                self.gui_queue.put(('dump', (self.chain, self.transaction_pool), 'local'))
+                self.gui_ready = True
+                return
             if msg_address != 'local':
                 return
             pprint(vars(self))
