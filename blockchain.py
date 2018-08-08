@@ -1,6 +1,7 @@
 """ Abstract implementation of a blockchain
 """
 import hashlib
+import math
 import os
 import pickle
 from collections import OrderedDict, namedtuple
@@ -144,6 +145,7 @@ class Blockchain(object):
 
         if block.header in self.new_chain:
             if self.validate_block(block, self.nc_latest_block()):
+                # Validate transactions only after full chain
                 self.new_chain[block.header] = block.transactions
 
                 # Check if new chain is finished
@@ -333,7 +335,6 @@ class Blockchain(object):
     def create_merkle_root(transactions: List[Transaction]) -> str:
         """ Calculate the merkle root of the transactions.
 
-            !!! NOT REALLY IMPLEMENTED !!!
 
         Args:
             transaction: List of transactions
@@ -342,7 +343,41 @@ class Blockchain(object):
             Merkle root of transactions.
         """
 
-        return Blockchain.hash(transactions)
+        # Hash empty transaction list
+        # Should only exist in Genesis Block
+        if not transactions:
+            return Blockchain.hash(transactions)
+
+        # Create leaf-hash
+
+        hash_list = list(map(
+            lambda t: Blockchain.hash(t),
+            sorted(transactions, key=lambda i_t: i_t.timestamp)))
+
+        # Make perfect full binary tree
+
+        for h in range(len(hash_list)):  # Artificial max length
+            if h < math.log2(len(hash_list)):
+                continue
+            while h != math.log2(len(hash_list)):
+                hash_list.append(hash_list[-1])
+            break
+
+        # Create Merkle-tree
+
+        t_hash: List[Any] = []
+
+        while len(hash_list) != 1:
+            print(hash_list)
+            t_hash.clear()
+            for i in range(0, len(hash_list), 2):
+                t_hash.append(Blockchain.hash(
+                    hash_list[i] +
+                    hash_list[i+1]
+                ))
+            hash_list = list(t_hash)
+
+        return hash_list[0]
 
     @staticmethod
     def hash(data: Any) -> str:
