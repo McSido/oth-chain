@@ -42,7 +42,10 @@ class Blockchain(object):
         send_queue: Queue for messages to other nodes
     """
 
-    def __init__(self, version: float, send_queue: Queue, gui_queue: Queue) -> None:
+    def __init__(self,
+                 version: float,
+                 send_queue: Queue,
+                 gui_queue: Queue) -> None:
         self.chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
         self.new_chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
         self.transaction_pool: List[Transaction] = []
@@ -356,9 +359,8 @@ class Blockchain(object):
 
         # Create leaf-hash
 
-        hash_list = list(map(
-            lambda t: Blockchain.hash(t),
-            sorted(transactions, key=lambda i_t: i_t.timestamp)))
+        hash_list = [Blockchain.hash(t) for t in sorted(
+            transactions, key=lambda i_t: i_t.timestamp)]
 
         # Make perfect full binary tree
 
