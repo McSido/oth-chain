@@ -129,29 +129,33 @@ class ChainHistoryWidget(QWidget):
         self.chain = data[0]
         self.transaction_pool = data[1]
 
-        for block in self.chain:
-            self.add_tree_item(block)
+        for block, transactions in self.chain.items():
+            self.add_tree_item(Block(block, transactions))
         for transaction in self.transaction_pool:
             self.add_transaction_pool_item(transaction)
 
     def add_tree_item(self, block: Block):
         item = QTreeWidgetItem()
         item.setText(0, 'Block')
-        item.setText(1, '#' + str(block.index))
+        item.setText(1, '#' + str(block.header.index))
         self.history.insertTopLevelItem(1, item)
         timestamp = QTreeWidgetItem()
         timestamp.setText(0, 'Timestamp:')
         timestamp.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
-                                               time.gmtime(block.timestamp))))
+                                               time.gmtime(block.header.timestamp))))
         proof = QTreeWidgetItem()
         proof.setText(0, 'Proof:')
-        proof.setText(1, str(block.proof))
+        proof.setText(1, str(block.header.proof))
         prev_hash = QTreeWidgetItem()
         prev_hash.setText(0, 'Previous hash:')
-        prev_hash.setText(1, str(block.previous_hash))
+        prev_hash.setText(1, str(block.header.previous_hash))
+        root_hash = QTreeWidgetItem()
+        root_hash.setText(0, 'Root hash:')
+        root_hash.setText(1, str(block.header.root_hash))
         item.addChild(timestamp)
         item.addChild(proof)
         item.addChild(prev_hash)
+        item.addChild(root_hash)
         transactions = QTreeWidgetItem()
         transactions.setText(0, 'Transactions:')
         item.addChild(transactions)
