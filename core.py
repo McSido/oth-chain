@@ -24,6 +24,7 @@ from networking import Address
 from blockchain import Blockchain
 from GUI import *
 from keystore import Keystore, load_key, save_key
+from dns_chain import DNSBlockChain
 from pow_chain import PoW_Blockchain, Transaction
 from utils import print_debug_info, set_debug
 
@@ -96,18 +97,22 @@ def parse_args(argv):
     keystore_filename = 'keystore'
     port = 6666
     signing_key = None
+    dns = False
     try:
-        opts, _ = getopt.getopt(argv[1:], 'hdp=k=s=', [
-                                'help', 'debug', 'port=', 'key=', 'store='])
+        opts, _ = getopt.getopt(argv[1:], 'hdnp=k=s=', [
+                                'help', 'debug', 'dns', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-d/--debug to enable debug prints')
+                print('-n/--dns to start a dns chain')
                 print('-p/--port to change default port')
                 print('-k/--key to load a private key from a file')
                 print('-s/--store to load a keystore from a file')
                 sys.exit()
             if o in ('-d', '--debug'):
                 set_debug()
+            if o in ('-n', '--dns'):
+                dns = True
             if o in ('-p', '--port'):
                 try:
                     port = int(a)
@@ -129,10 +134,10 @@ def parse_args(argv):
         print(err)
         sys.exit()
 
-    return keystore_filename, port, signing_key
+    return keystore_filename, port, signing_key, dns
 
 
-def init(keystore_filename: str, port: int, signing_key):
+def init(keystore_filename: str, port: int, signing_key, dns: bool):
     """ Initialize the blockchain client.
 
     Args:
@@ -141,8 +146,11 @@ def init(keystore_filename: str, port: int, signing_key):
         signing_key: Key of the current user
     """
     # Create proof-of-work blockchain
-    
-    my_blockchain = PoW_Blockchain(VERSION, send_queue, gui_send_queue)
+
+    if dns:
+        my_blockchain = DNSBlockChain(VERSION, send_queue, gui_send_queue)
+    else:
+        my_blockchain = PoW_Blockchain(VERSION, send_queue, gui_send_queue)
     my_blockchain_processor = my_blockchain.process_message()
 
     # Create networking thread
@@ -179,7 +187,7 @@ def init(keystore_filename: str, port: int, signing_key):
         args=(gui_send_queue, receive_queue, gui_receive_queue, keystore), )  # daemon=True
 
     return keystore, signing_key, verify_key_hex, networker, \
-        blockchain_thread, gui_thread
+        blockchain_thread, gui_thread, dns
 
 
 def main(argv):
@@ -191,7 +199,7 @@ def main(argv):
         argv: Arguments from the command line.
     """
     keystore, signing_key, verify_key_hex, networker, \
-        blockchain_thread, gui_thread = init(
+        blockchain_thread, gui_thread, dns = init(
             *parse_args(argv))
 
     # User Interaction
@@ -334,12 +342,19 @@ keystore
                                    (account, time.time()),
                                    'local'
                                    ))
+        elif re.fullmatch(r'resolve \w+', command):
+            t = command.split(' ')
+            # DUMMY CODE
+            print('127.0.0.1')
         elif command == 'save':
             receive_queue.put(('save',
                                '',
                                'local'
                                ))
         elif command == 'gui':
+            if dns:
+                print('GUI not yet supported for DNS Chain')
+                continue
             print("open gui")
             gui_thread.start()
             gui_send_queue.put(('signing_key', signing_key, 'local'))
