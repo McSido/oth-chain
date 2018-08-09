@@ -12,6 +12,7 @@ import math
 import pickle
 import re
 import time
+import socket
 from typing import Any
 
 import nacl.encoding
@@ -24,7 +25,7 @@ from networking import Address
 from blockchain import Blockchain
 from GUI import *
 from keystore import Keystore, load_key, save_key
-from dns_chain import DNSBlockChain
+from dns_chain import DNSBlockChain, DNS_Transaction, DNS_Data
 from pow_chain import PoW_Blockchain, Transaction
 from utils import print_debug_info, set_debug
 
@@ -100,7 +101,7 @@ def parse_args(argv):
     dns = False
     try:
         opts, _ = getopt.getopt(argv[1:], 'hdnp=k=s=', [
-                                'help', 'debug', 'dns', 'port=', 'key=', 'store='])
+            'help', 'debug', 'dns', 'port=', 'key=', 'store='])
         for o, a in opts:
             if o in ('-h', '--help'):
                 print('-d/--debug to enable debug prints')
@@ -165,8 +166,6 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
         args=(my_blockchain, my_blockchain_processor))
     blockchain_thread.start()
 
-
-
     # Update to newest chain
     send_queue.put(('get_newest_block', '', 'broadcast'))
 
@@ -187,7 +186,7 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
         args=(gui_send_queue, receive_queue, gui_receive_queue, keystore), )  # daemon=True
 
     return keystore, signing_key, verify_key_hex, networker, \
-        blockchain_thread, gui_thread, dns
+           blockchain_thread, gui_thread, dns
 
 
 def main(argv):
@@ -199,8 +198,8 @@ def main(argv):
         argv: Arguments from the command line.
     """
     keystore, signing_key, verify_key_hex, networker, \
-        blockchain_thread, gui_thread, dns = init(
-            *parse_args(argv))
+    blockchain_thread, gui_thread, dns = init(
+        *parse_args(argv))
 
     # User Interaction
     while True:
@@ -268,7 +267,7 @@ keystore
             timestamp = time.time()
             # fee equals 5% of the transaction amount - at least 1
             fee = math.ceil(int(t[2]) * 0.05)
-            transaction_hash = hashlib.\
+            transaction_hash = hashlib. \
                 sha256((str(verify_key_hex) +
                         str(recipient) + str(t[2])
                         + str(fee) +
@@ -342,10 +341,53 @@ keystore
                                    (account, time.time()),
                                    'local'
                                    ))
-        elif re.fullmatch(r'resolve \w+', command):
+        elif re.fullmatch(r'resolve \w+\.\w+', command):
+            if not dns:
+                'Command not supported!'
+                continue
             t = command.split(' ')
-            # DUMMY CODE
-            print('127.0.0.1')
+            receive_queue.put(('dns_lookup',
+                               t[1],
+                               'local'
+                               ))
+        elif re.fullmatch(r'(register|update) \w+\.\w+ \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', command):
+            if not dns:
+                'Command not supported!'
+                continue
+            t = command.split(' ')
+            valid_ip = True
+            try:
+                socket.inet_aton(t[2])
+            except:
+                valid_ip = False
+            if not valid_ip:
+                print('Not a valid ip')
+                continue
+            recipient = 0
+            timestamp = time.time()
+            # fee for domain registration equals 20
+            fee = 20
+            typ = t[0][0]
+            data = DNS_Data(typ, t[1], t[2])
+            transaction_hash = hashlib. \
+                sha256((str(verify_key_hex) +
+                        str(recipient) + str(0)
+                        + str(fee) + str(data) +
+                        str(timestamp)).encode()).hexdigest()
+
+            receive_queue.put(('new_transaction',
+                               DNS_Transaction(verify_key_hex,
+                                               recipient,
+                                               0,
+                                               fee,
+                                               timestamp,
+                                               data,
+                                               signing_key.sign(
+                                                   transaction_hash.encode())
+                                               ),
+                               'local'
+                               ))
+
         elif command == 'save':
             receive_queue.put(('save',
                                '',
