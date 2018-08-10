@@ -382,7 +382,7 @@ keystore
             if not valid_ip:
                 print('Not a valid ip')
                 continue
-            recipient = 0
+            recipient = '0'
             timestamp = time.time()
             # fee for domain registration equals 20
             fee = 20
@@ -437,6 +437,36 @@ keystore
                                                    ),
                                    'local'
                                    ))
+        elif re.fullmatch(r'auction \w+\.\w+', command):
+            if not dns:
+                print('Command not supported!')
+                continue
+            t = command.split(' ')
+            recipient = '0'
+            timestamp = time.time()
+            # fee for domain transfer equals 1
+            fee = 1
+            typ = 't'
+            data = DNS_Data(typ, t[1], '')
+            transaction_hash = hashlib. \
+                sha256((str(verify_key_hex) +
+                        str(recipient) + str(0)
+                        + str(fee) + str(data) +
+                        str(timestamp)).encode()).hexdigest()
+
+            receive_queue.put(('new_transaction',
+                               DNS_Transaction(verify_key_hex,
+                                               recipient,
+                                               0,
+                                               fee,
+                                               timestamp,
+                                               data,
+                                               signing_key.sign(
+                                                   transaction_hash.encode())
+                                               ),
+                               'local'
+                               ))
+
         elif command == 'save':
             receive_queue.put(('save',
                                '',

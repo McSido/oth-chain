@@ -1,14 +1,15 @@
 import hashlib
+from queue import Queue
 
 from nacl.exceptions import BadSignatureError
 
 from pow_chain import PoW_Blockchain
 from blockchain import Block, Transaction, Header
-from typing import Any, Dict, Callable, Tuple
+from typing import Any, Dict, Callable, Tuple, List
 from networking import Address
 from pprint import pprint
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import nacl.encoding
 import nacl.signing
@@ -31,8 +32,48 @@ DNS_Data = namedtuple('DNS_Data',
                        'domain_name',
                        'ip_address'])
 
+# Number of mined blocks after which the auction is closed
+MAX_AUCTION_TIME = 5
 
 class DNSBlockChain(PoW_Blockchain):
+
+    def __init__(self,
+                 version: float,
+                 send_queue: Queue,
+                 gui_queue: Queue) -> None:
+        super(DNSBlockChain, self).__init__(version, send_queue, gui_queue)
+        self.chain: OrderedDict[Header, List[DNS_Transaction]] = OrderedDict()
+        self.new_chain: OrderedDict[Header, List[DNS_Transaction]] = OrderedDict()
+        self.transaction_pool: List[DNS_Transaction] = []
+        self.load_chain()   # overwrite?
+        self.auctions: OrderedDict[int, List[Tuple[DNS_Transaction, DNS_Transaction]]] = OrderedDict()
+
+    def new_transaction(self, transaction: Transaction):
+        """ Add a new transaction to the blockchain.
+            If the receiver is 0, and the domain operation is 'transfer',
+            an auction for that domain is started.
+
+        Args:
+            transaction: Transaction that should be added.
+        """
+        # Make sure, only one mining reward is granted per block
+        for pool_transaction in self.transaction_pool:
+            if pool_transaction.sender == '0' and \
+                    pool_transaction.signature == '0':
+                print_debug_info(
+                    'This block already granted a mining transaction!')
+                return
+        if transaction in self.latest_block().transactions:
+            return
+        if self.validate_transaction(transaction):
+            self.transaction_pool.append(transaction)
+            self.send_queue.put(('new_transaction', transaction, 'broadcast'))
+            if self.gui_ready:
+                self.gui_queue.put(('new_transaction', transaction, 'local'))
+            if transaction.recipient == '0' and transaction.data.type == 't':
+                self._auction(transaction)
+        else:
+            print_debug_info('Invalid transaction')
 
     def validate_transaction(self, transaction: Transaction, mining: bool = False) -> bool:
         normal_transaction = False
@@ -227,3 +268,15 @@ class DNSBlockChain(PoW_Blockchain):
             if not ip or owner != transaction.sender:
                 return False
         return True
+
+    def _auction(self, transaction: DNS_Transaction):
+        # If no one bids on the transaction, the owner of the domain gets the fee and domain back
+        bid_transaction = DNS_Transaction(
+            '0', transaction.sender, transaction.fee, 1, time.time(), DNS_Data('', '', ''), '1'
+        )
+        # auctions are closed after MAX_AUCTION_TIME blocks are mined
+        try:
+            self.auctions[self.latest_header().index + MAX_AUCTION_TIME]
+        except KeyError:
+            self.auctions[self.latest_header().index + MAX_AUCTION_TIME] = []
+        self.auctions[self.latest_header().index + MAX_AUCTION_TIME].append((transaction, bid_transaction))
