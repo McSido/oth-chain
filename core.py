@@ -267,23 +267,42 @@ keystore
             timestamp = time.time()
             # fee equals 5% of the transaction amount - at least 1
             fee = math.ceil(int(t[2]) * 0.05)
-            transaction_hash = hashlib. \
-                sha256((str(verify_key_hex) +
-                        str(recipient) + str(t[2])
-                        + str(fee) +
-                        str(timestamp)).encode()).hexdigest()
-
-            receive_queue.put(('new_transaction',
-                               Transaction(verify_key_hex,
-                                           recipient,
-                                           int(t[2]),
-                                           fee,
-                                           timestamp,
-                                           signing_key.sign(
-                                               transaction_hash.encode())
-                                           ),
-                               'local'
-                               ))
+            if not dns:
+                transaction_hash = hashlib. \
+                    sha256((str(verify_key_hex) +
+                            str(recipient) + str(t[2])
+                            + str(fee) +
+                            str(timestamp)).encode()).hexdigest()
+                receive_queue.put(('new_transaction',
+                                   Transaction(verify_key_hex,
+                                               recipient,
+                                               int(t[2]),
+                                               fee,
+                                               timestamp,
+                                               signing_key.sign(
+                                                   transaction_hash.encode())
+                                               ),
+                                   'local'
+                                   ))
+            else:
+                data = DNS_Data('', '', '')
+                transaction_hash = hashlib. \
+                    sha256((str(verify_key_hex) +
+                            str(recipient) + str(t[2])
+                            + str(fee) + str(data) +
+                            str(timestamp)).encode()).hexdigest()
+                receive_queue.put(('new_transaction',
+                                   DNS_Transaction(verify_key_hex,
+                                                   recipient,
+                                                   int(t[2]),
+                                                   fee,
+                                                   timestamp,
+                                                   data,
+                                                   signing_key.sign(
+                                                       transaction_hash.encode())
+                                                   ),
+                                   'local'
+                                   ))
         elif command == 'dump':
             # gui_send_queue.put(vars(my_blockchain))
             # pprint(vars(my_blockchain))
@@ -387,7 +406,37 @@ keystore
                                                ),
                                'local'
                                ))
+        elif re.fullmatch(r'transfer \w+ \w+\.\w+', command):
+            if not dns:
+                print('Command not supported!')
+                continue
+            t = command.split(' ')
+            account = keystore.resolve_name(t[1])
+            if account != 'Error':
+                recipient = account
+                timestamp = time.time()
+                # fee for domain transfer equals 1
+                fee = 1
+                typ = 't'
+                data = DNS_Data(typ, t[2], '')
+                transaction_hash = hashlib. \
+                    sha256((str(verify_key_hex) +
+                            str(recipient) + str(0)
+                            + str(fee) + str(data) +
+                            str(timestamp)).encode()).hexdigest()
 
+                receive_queue.put(('new_transaction',
+                                   DNS_Transaction(verify_key_hex,
+                                                   recipient,
+                                                   0,
+                                                   fee,
+                                                   timestamp,
+                                                   data,
+                                                   signing_key.sign(
+                                                       transaction_hash.encode())
+                                                   ),
+                                   'local'
+                                   ))
         elif command == 'save':
             receive_queue.put(('save',
                                '',

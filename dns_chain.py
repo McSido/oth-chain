@@ -17,7 +17,7 @@ import time
 
 from utils import print_debug_info
 
-DNS_Transaction = namedtuple('Transaction',
+DNS_Transaction = namedtuple('DNS_Transaction',
                              ['sender',
                               'recipient',
                               'amount',
@@ -35,19 +35,25 @@ DNS_Data = namedtuple('DNS_Data',
 class DNSBlockChain(PoW_Blockchain):
 
     def validate_transaction(self, transaction: Transaction, mining: bool = False) -> bool:
-        print(transaction)
+        normal_transaction = False
+        valid_domain_operation = False
 
-        if transaction.data.type not in 'urt' and transaction.amount == 0:
-            return False
-        valid_domain_operation = self._is_valid_domain_transaction(transaction)
-        if not valid_domain_operation:
-            return False
+        if transaction.data.type not in 'urt':
+            normal_transaction = True
+            if transaction.amount == 0:
+                return False
+        if not normal_transaction:
+            valid_domain_operation = self._is_valid_domain_transaction(transaction)
+            if not valid_domain_operation:
+                return False
 
         if not mining:
             found = False
             for t in self.transaction_pool:
                 if t == self.transaction_pool:
                     return False
+                if normal_transaction:
+                    continue
                 if t.data.domain_name == transaction.data.domain_name:
                     found = True
                     if transaction.data.type == 'r':
@@ -201,9 +207,9 @@ class DNSBlockChain(PoW_Blockchain):
     def _resolve_domain_name(self, name: str) -> Tuple[Any, Any]:
         for block_transaction in list(self.chain.values())[::-1]:
             for transaction in block_transaction[::-1]:
-                if transaction.data.type not in 'ur':
-                    continue
                 if transaction.data.domain_name == name:
+                    if transaction.data.type == 't':
+                        return '', transaction.recipient
                     return transaction.data.ip_address, transaction.sender
 
         return '', ''
@@ -217,7 +223,7 @@ class DNSBlockChain(PoW_Blockchain):
         ip, owner = self._resolve_domain_name(transaction.data.domain_name)
         if transaction.data.type == 'r' and ip:
             return False
-        elif transaction.data.type == 'u':
+        elif transaction.data.type in 'ut':
             if not ip or owner != transaction.sender:
                 return False
         return True
