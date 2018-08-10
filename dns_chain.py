@@ -79,6 +79,11 @@ class DNSBlockChain(PoW_Blockchain):
         normal_transaction = False
         valid_domain_operation = False
 
+        # Resolved auctions, original auction as well as all bids are verified when first posted
+        # Therefore we can simply accept these transactions
+        if transaction.sender == '0' and transaction.signature == '1':
+            return True
+
         if transaction.data.type not in 'urt':
             normal_transaction = True
             if transaction.amount == 0:
@@ -158,6 +163,14 @@ class DNSBlockChain(PoW_Blockchain):
             proof = self.create_proof(msg_data)
             block = self.create_block(proof)
             fee_sum = 0
+            # Resolve possible auctions:
+            try:
+                auction_list = self.auctions[block.header.index]
+                for auction in auction_list:
+                    block.transactions.extend(self._resolve_auction(auction))
+                self.auctions.pop(block.header.index)
+            except KeyError:
+                pass
             for transaction in block.transactions:
                 fee_sum += transaction.fee
             reward_multiplier = math.floor(block.header.index / 10) - 1
@@ -280,3 +293,26 @@ class DNSBlockChain(PoW_Blockchain):
         except KeyError:
             self.auctions[self.latest_header().index + MAX_AUCTION_TIME] = []
         self.auctions[self.latest_header().index + MAX_AUCTION_TIME].append((transaction, bid_transaction))
+
+    def _resolve_auction(self, auction: Tuple[DNS_Transaction, DNS_Transaction]):
+        t1 = auction[0]  # original auction
+        t2 = auction[1]  # highest bid
+        domain = t1.data.domain_name
+        t_sender = '0'
+        t_recipient = t2.sender if t2.sender != '0' else t1.sender
+        t_amount = 0
+        t_fee = 1
+        t_timestamp = time.time()
+        t_data = DNS_Data('t', domain, '')
+        transfer_transaction = DNS_Transaction(t_sender, t_recipient, t_amount, t_fee, t_timestamp, t_data, '1')
+
+        p_sender = '0'
+        p_recipient = t1.sender
+        p_amount = t2.amount
+        p_fee = 1
+        p_timestamp = time.time()
+        p_data = DNS_Data('', '', '')
+        payment_transaction = DNS_Transaction(p_sender, p_recipient, p_amount, p_fee, p_timestamp, p_data, '1')
+
+        return [transfer_transaction, payment_transaction]
+
