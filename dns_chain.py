@@ -35,6 +35,7 @@ DNS_Data = namedtuple('DNS_Data',
 # Number of mined blocks after which the auction is closed
 MAX_AUCTION_TIME = 5
 
+
 class DNSBlockChain(PoW_Blockchain):
 
     def __init__(self,
@@ -45,7 +46,7 @@ class DNSBlockChain(PoW_Blockchain):
         self.chain: OrderedDict[Header, List[DNS_Transaction]] = OrderedDict()
         self.new_chain: OrderedDict[Header, List[DNS_Transaction]] = OrderedDict()
         self.transaction_pool: List[DNS_Transaction] = []
-        self.load_chain()   # overwrite?
+        self.load_chain()  # overwrite?
         self.auctions: OrderedDict[int, List[Tuple[DNS_Transaction, DNS_Transaction]]] = OrderedDict()
 
     def new_transaction(self, transaction: Transaction):
@@ -72,6 +73,8 @@ class DNSBlockChain(PoW_Blockchain):
                 self.gui_queue.put(('new_transaction', transaction, 'local'))
             if transaction.recipient == '0' and transaction.data.type == 't':
                 self._auction(transaction)
+            if transaction.recipient == '0' and transaction.data.type == 'b':
+                self._bid(transaction)
         else:
             print_debug_info('Invalid transaction')
 
@@ -84,7 +87,7 @@ class DNSBlockChain(PoW_Blockchain):
         if transaction.sender == '0' and transaction.signature == '1':
             return True
 
-        if transaction.data.type not in 'urt':
+        if transaction.data.type not in 'burt':
             normal_transaction = True
             if transaction.amount == 0:
                 return False
@@ -96,7 +99,7 @@ class DNSBlockChain(PoW_Blockchain):
         if not mining:
             found = False
             for t in self.transaction_pool:
-                if t == self.transaction_pool:
+                if t == transaction:
                     return False
                 if normal_transaction:
                     continue
@@ -274,6 +277,16 @@ class DNSBlockChain(PoW_Blockchain):
         Args:
             transaction: The transaction to be validated
         """
+        if transaction.data.type == 'b':
+            for auction_list in self.auctions.values():
+                for auction in auction_list:
+                    if auction[0].data.domain_name == transaction.data.domain_name:
+                        if transaction.amount > auction[1].amount:
+                            return True
+                        if transaction == auction[1]:
+                            return True
+                        return False
+            return False
         ip, owner = self._resolve_domain_name(transaction.data.domain_name)
         if transaction.data.type == 'r' and ip:
             return False
@@ -316,3 +329,22 @@ class DNSBlockChain(PoW_Blockchain):
 
         return [transfer_transaction, payment_transaction]
 
+    def _bid(self, transaction: DNS_Transaction):
+        reimburse_transaction = None
+        for auction_list in self.auctions.values():
+            for i, auction in enumerate(auction_list):
+                if auction[0].data.domain_name == transaction.data.domain_name:
+                    reimburse_transaction = auction[1]
+                    auction_list[i] = (auction[0], transaction)
+
+        if not reimburse_transaction.sender == '0':
+            t = DNS_Transaction(
+                '0',
+                reimburse_transaction.sender,
+                reimburse_transaction.amount,
+                1,
+                time.time(),
+                DNS_Data('', '', ''),
+                '1'
+            )
+            self.new_transaction(t)
