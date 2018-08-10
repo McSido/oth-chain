@@ -50,7 +50,6 @@ class PoW_Blockchain(Blockchain):
 
         return True
 
-
     def validate_block(self, block: Block, last_block: Block) -> bool:
         """ Validates a provided block.
 
@@ -222,6 +221,9 @@ class PoW_Blockchain(Blockchain):
                         print_debug_info('Conflict resolved (old chain)')
                         return
 
+                # Clear intermediate transactions
+                self.intermediate_transactions.clear()
+
                 # Create blockchain from new_chain
                 new_bchain: OrderedDict[Header, List[Transaction]] = \
                     OrderedDict([(h, None) for h in new_chain])
@@ -231,11 +233,19 @@ class PoW_Blockchain(Blockchain):
                     if h in new_bchain:
                         new_bchain[h] = t
                     else:
-                        break  # Can't be missing blocks in main chain
+                        # Update intermediate transactions
+                        self.intermediate_transactions += t
 
                 for h, t in self.new_chain.items():
                     if h in new_bchain:
                         new_bchain[h] = t
+                        if t:
+                            for i_t in t:
+                                try:
+                                    # Remove processed transactions
+                                    self.intermediate_transactions.remove(i_t)
+                                except ValueError:
+                                    pass
 
                 self.new_chain = new_bchain
                 print_debug_info('Conflict (Header) resolved (new chain)')
@@ -334,7 +344,8 @@ class PoW_Blockchain(Blockchain):
 
         def dump_vars(_: Any, msg_address: Address):
             if msg_address == 'gui':
-                self.gui_queue.put(('dump', (self.chain, self.transaction_pool), 'local'))
+                self.gui_queue.put(
+                    ('dump', (self.chain, self.transaction_pool), 'local'))
                 self.gui_ready = True
                 return
             if msg_address != 'local':

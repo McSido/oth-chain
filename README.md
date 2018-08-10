@@ -1,6 +1,7 @@
 # Blockchain for the project-study
 
 [![Build Status](https://travis-ci.org/McSido/oth-chain.svg?branch=master)](https://travis-ci.org/McSido/oth-chain)
+[![CodeFactor](https://www.codefactor.io/repository/github/mcsido/oth-chain/badge)](https://www.codefactor.io/repository/github/mcsido/oth-chain)
 
 ## Instructions
 

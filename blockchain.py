@@ -49,6 +49,7 @@ class Blockchain(object):
         self.chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
         self.new_chain: OrderedDict[Header, List[Transaction]] = OrderedDict()
         self.transaction_pool: List[Transaction] = []
+        self.intermediate_transactions: List[Transaction] = []
         self.send_queue = send_queue
         self.gui_ready = False
         self.gui_queue = gui_queue
@@ -157,12 +158,22 @@ class Blockchain(object):
                 # Validate transactions only after full chain
                 self.new_chain[block.header] = block.transactions
 
+                for t in block.transactions:
+                    try:
+                        # Remove processed transactions
+                        self.intermediate_transactions.remove(t)
+                    except ValueError:
+                        pass
+
                 # Check if new chain is finished
                 if not any(t is None for t in self.new_chain.values()):
                     self.send_queue.put(
                         ('new_header', self.nc_latest_header(), 'broadcast'))
                     self.chain = OrderedDict(self.new_chain)
                     self.new_chain.clear()
+                    self.transaction_pool = List(
+                        self.intermediate_transactions)
+                    self.intermediate_transactions.clear()
 
             else:
                 print_debug_info('Block not for new chain')
