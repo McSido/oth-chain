@@ -295,17 +295,18 @@ class DNSBlockChain(PoW_Blockchain):
                 return False
         return True
 
-    def _auction(self, transaction: DNS_Transaction):
+    def _auction(self, transaction: DNS_Transaction, index: int = 0):
         # If no one bids on the transaction, the owner of the domain gets the fee and domain back
         bid_transaction = DNS_Transaction(
             '0', transaction.sender, transaction.fee, 1, time.time(), DNS_Data('', '', ''), '1'
         )
         # auctions are closed after MAX_AUCTION_TIME blocks are mined
+        i = self.latest_header().index if index == 0 else index
         try:
-            self.auctions[self.latest_header().index + MAX_AUCTION_TIME]
+            self.auctions[i + MAX_AUCTION_TIME]
         except KeyError:
-            self.auctions[self.latest_header().index + MAX_AUCTION_TIME] = []
-        self.auctions[self.latest_header().index + MAX_AUCTION_TIME].append((transaction, bid_transaction))
+            self.auctions[i + MAX_AUCTION_TIME] = []
+        self.auctions[i + MAX_AUCTION_TIME].append((transaction, bid_transaction))
 
     def _resolve_auction(self, auction: Tuple[DNS_Transaction, DNS_Transaction]):
         t1 = auction[0]  # original auction
@@ -348,3 +349,15 @@ class DNSBlockChain(PoW_Blockchain):
                 '1'
             )
             self.new_transaction(t)
+
+    def _sync_auctions(self):
+        """Synchronizes the auctions dict after conflicts are resolved
+
+        """
+        for header, transaction_list in list(self.chain.items())[-MAX_AUCTION_TIME:]:
+            print(header.index, transaction_list)
+            for transaction in transaction_list:
+                if transaction.recipient == '0' and transaction.data.type == 't':
+                    self._auction(transaction, index=header.index)
+                if transaction.recipient == '0' and transaction.data.type == 'b':
+                    self._bid(transaction)
