@@ -3,10 +3,11 @@ from queue import Queue
 
 from nacl.exceptions import BadSignatureError
 
-from pow_chain import PoW_Blockchain
-from blockchain import Block, Transaction, Header
+from .pow_chain import PoW_Blockchain
+from .blockchain import Block, Transaction, Header
 from typing import Any, Dict, Callable, Tuple, List
 from networking import Address
+from utils import print_debug_info
 from pprint import pprint
 
 from collections import namedtuple, OrderedDict
@@ -16,7 +17,6 @@ import nacl.signing
 import math
 import time
 
-from utils import print_debug_info
 
 DNS_Transaction = namedtuple('DNS_Transaction',
                              ['sender',
@@ -336,7 +336,8 @@ class DNSBlockChain(PoW_Blockchain):
             self.auctions[i + MAX_AUCTION_TIME] = []
         self.auctions[i + MAX_AUCTION_TIME].append((transaction, bid_transaction))
 
-    def _resolve_auction(self, auction: Tuple[DNS_Transaction, DNS_Transaction]):
+    @staticmethod
+    def _resolve_auction(auction: Tuple[DNS_Transaction, DNS_Transaction]):
         """ Resolves an auction given through a  tuple of transactions by creating
             two transactions 1) the transfer of the domain to the highest bidder and
             2) the payment of the bid to the initiator of the auction.

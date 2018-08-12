@@ -1,6 +1,6 @@
 import pickle
 
-from utils import print_debug_info
+from .utils import print_debug_info
 
 
 def load_key(filename):

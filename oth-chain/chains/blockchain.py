@@ -11,8 +11,8 @@ from queue import Queue
 from time import time
 from typing import Any, Callable, List, Optional
 
-from networking import Address
 from utils import print_debug_info
+from networking import Address
 
 Transaction = namedtuple('Transaction',
                          ['sender',
@@ -386,7 +386,7 @@ class Blockchain(object):
 
 
         Args:
-            transaction: List of transactions
+            transactions: List of transactions
 
         Returns:
             Merkle root of transactions.

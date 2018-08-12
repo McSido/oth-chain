@@ -4,10 +4,10 @@
 import socket
 from queue import Queue
 
-from peers import PeerManager
+from networking import PeerManager
 
 
-class TestPeers():
+class TestPeers(object):
     """ Testcase used to bundle all test for the
     Peer2Peer module of the blockchain client.
     """

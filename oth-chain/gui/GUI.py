@@ -9,13 +9,15 @@ import nacl.encoding
 import nacl.signing
 import nacl.utils
 
-from keystore import Keystore, load_key, save_key
+from utils import Keystore, load_key, save_key
+from chains import Block, Transaction
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QWidget, QVBoxLayout, QTabWidget, QTreeWidget, \
+    QScrollBar, QTreeWidgetItem, QListView, QPushButton, QLineEdit, QGroupBox, QFormLayout, QLabel, QHBoxLayout, \
+    QFileDialog, QSpinBox
 from PyQt5 import QtCore, QtGui
 from queue import Queue
-from blockchain import Block, Transaction
 
 
 def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keystore):
@@ -42,7 +44,7 @@ class ChainGUI(QMainWindow):
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
-        self.setWindowTitle('OTH-Chain')
+        self.setWindowTitle('oth-chain')
         self.setGeometry(500, 200, 1000, 500)
         self.show()
 

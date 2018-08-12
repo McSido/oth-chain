@@ -12,7 +12,7 @@ from typing import Dict, Tuple, Optional
 Address = Tuple[str, int]
 
 
-class ExtendedUDP():
+class ExtendedUDP(object):
     """ Implementation of an extended UDP socket.
 
     Can send/receive messages that are bigger
@@ -114,7 +114,7 @@ class ExtendedUDP():
             for addr, (finished, msg) in self.received_data.items():
                 if finished:
                     self.received_data.pop(addr)
-                    return(msg, addr)
+                    return msg, addr
 
         except socket.error:
             return None

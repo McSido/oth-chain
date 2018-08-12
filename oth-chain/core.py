@@ -9,25 +9,23 @@ Also contains various functions for private/public keys.
 import getopt
 import hashlib
 import math
-import pickle
 import re
-import time
 import socket
+import sys
+import threading
+import time
+from queue import Queue
 from typing import Any
 
 import nacl.encoding
 import nacl.signing
 import nacl.utils
 
-import cli
-import networking
-from networking import Address
-from blockchain import Blockchain
-from GUI import *
-from keystore import Keystore, load_key, save_key
-from dns_chain import DNSBlockChain, DNS_Transaction, DNS_Data
-from pow_chain import PoW_Blockchain, Transaction
-from utils import print_debug_info, set_debug
+
+from chains import Blockchain, DNSBlockChain, DNS_Transaction, DNS_Data, PoW_Blockchain, Transaction
+from gui import gui_loop
+from networking import Address, worker
+from utils import Keystore, load_key, save_key, print_debug_info, set_debug
 
 # Create queues for message transfer blockchain<->networking
 # Every message on the send_queue should be sent to all connected
@@ -145,6 +143,7 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
         keystore_filename: Filename of the keystore.
         port: Port used for networking.
         signing_key: Key of the current user
+        dns: Indicates, whether the chain is a dns-chain or a normal pow-chain
     """
     # Create proof-of-work blockchain
 
@@ -156,7 +155,7 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
 
     # Create networking thread
     networker = threading.Thread(
-        target=networking.worker,
+        target=worker,
         args=(send_queue, receive_queue, networker_command_queue, gui_send_queue, port))
     networker.start()
 
@@ -185,8 +184,7 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
         target=gui_loop,
         args=(gui_send_queue, receive_queue, gui_receive_queue, keystore), )  # daemon=True
 
-    return keystore, signing_key, verify_key_hex, networker, \
-           blockchain_thread, gui_thread, dns
+    return keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread, dns
 
 
 def main(argv):
@@ -197,9 +195,7 @@ def main(argv):
     Args:
         argv: Arguments from the command line.
     """
-    keystore, signing_key, verify_key_hex, networker, \
-    blockchain_thread, gui_thread, dns = init(
-        *parse_args(argv))
+    keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread, dns = init(*parse_args(argv))
 
     # User Interaction
     while True:
@@ -207,7 +203,7 @@ def main(argv):
         if gui_thread.is_alive():
             if not gui_receive_queue.empty():
                 command = gui_receive_queue.get(block=True)
-                print('Command from GUI: {}'.format(command))
+                print('Command from gui: {}'.format(command))
             else:
                 continue
         else:
@@ -377,7 +373,7 @@ keystore
             valid_ip = True
             try:
                 socket.inet_aton(t[2])
-            except:
+            except OSError:
                 valid_ip = False
             if not valid_ip:
                 print('Not a valid ip')
@@ -502,7 +498,7 @@ keystore
                                ))
         elif command == 'gui':
             if dns:
-                print('GUI not yet supported for DNS Chain')
+                print('gui not yet supported for DNS Chain')
                 continue
             print("open gui")
             gui_thread.start()

@@ -3,10 +3,9 @@
 
 from queue import Queue
 
-import networking
-from ext_udp import ExtendedUDP
+from networking import ExtendedUDP, SERVER, PEERS, unpack_msg, process_incoming_msg, pack_msg, send_msg
 
-networking.SERVER.setup(6666)
+SERVER.setup(6666)
 
 RECEIVER = ExtendedUDP()
 
@@ -15,7 +14,7 @@ def setup():
     """ Setup RECEIVER for tests.
     """
     RECEIVER.setup(6667)
-    networking.PEERS.setup(Queue(), Queue(), 6667)
+    PEERS.setup(Queue(), Queue(), 6667)
 
 
 def teardown():
@@ -28,8 +27,8 @@ def test_packing():
     """ Test the packing and unpacking functionality.
     """
     data = [{'a': (1, 2)}, {'b': (3, 4)}]
-    packed = networking.pack_msg(data)
-    assert data == networking.unpack_msg(packed)
+    packed = pack_msg(data)
+    assert data == unpack_msg(packed)
 
 
 def test_process_incoming():
@@ -38,10 +37,10 @@ def test_process_incoming():
     """
     msg = ('to-blockchain', 'msg-data')
     receive_queue = Queue()
-    address = ('0.0.0.0', '1')
+    address = ('0.0.0.0', 1)
 
-    networking.process_incoming_msg(
-        networking.pack_msg(msg),
+    process_incoming_msg(
+        pack_msg(msg),
         address,
         receive_queue
     )
@@ -57,11 +56,11 @@ def test_unsplit_messaging():
 
     msg = ('test-msg', 'test-data')
 
-    networking.send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
+    send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
 
     received = RECEIVER.receive_msg()
 
-    assert networking.unpack_msg(received[0]) == (msg[0], msg[1])
+    assert unpack_msg(received[0]) == (msg[0], msg[1])
 
 
 def test_split_messaging_2():
@@ -70,9 +69,9 @@ def test_split_messaging_2():
     Test for split (2-parts) messages. (msg > BUFFER_SIZE)
     """
 
-    msg = ('test-msg', b'1' * (networking.SERVER.buffersize + 10))
+    msg = ('test-msg', b'1' * (SERVER.buffersize + 10))
 
-    networking.send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
+    send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
 
     received = RECEIVER.receive_msg()
 
@@ -81,7 +80,7 @@ def test_split_messaging_2():
     received = RECEIVER.receive_msg()
 
     # Check content
-    assert networking.unpack_msg(received[0]) == (msg[0], msg[1])
+    assert unpack_msg(received[0]) == (msg[0], msg[1])
 
 
 def test_split_messaging_3():
@@ -89,9 +88,9 @@ def test_split_messaging_3():
 
     Test for split (3-parts) messages. (msg >> BUFFER_SIZE)
     """
-    msg = ('test-msg', b'1' * (2 * networking.SERVER.buffersize + 10))
+    msg = ('test-msg', b'1' * (2 * SERVER.buffersize + 10))
 
-    networking.send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
+    send_msg(msg[0], msg[1], ('127.0.0.1', 6667))
 
     received = RECEIVER.receive_msg()
 
@@ -104,4 +103,4 @@ def test_split_messaging_3():
     received = RECEIVER.receive_msg()
 
     # Check content
-    assert networking.unpack_msg(received[0]) == (msg[0], msg[1])
+    assert unpack_msg(received[0]) == (msg[0], msg[1])

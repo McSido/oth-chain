@@ -1,18 +1,15 @@
 import getopt
 import sys
 import threading
-from typing import Any
-
 import dnslib.server
-from dnslib import RR, DNSRecord, RCODE
 
-import core
-import networking
-from blockchain import Blockchain
-from core import Address
-from dns_chain import DNSBlockChain
-from utils import print_debug_info, set_debug
+from dnslib import RR, DNSRecord, RCODE
 from queue import Queue
+from typing import Any
+from .chains import DNSBlockChain
+from .networking import Address, worker
+from .utils import print_debug_info, set_debug
+from . import core
 
 dns_queue: Queue = Queue()
 
@@ -115,7 +112,7 @@ def init(port):
 
     # Create networking thread
     networker = threading.Thread(
-        target=networking.worker,
+        target=worker,
         args=(core.send_queue,
               core.receive_queue,
               core.networker_command_queue,

@@ -12,7 +12,7 @@ import nacl.signing
 from nacl.exceptions import BadSignatureError
 from collections import OrderedDict
 
-from blockchain import Block, Blockchain, Transaction, Header
+from .blockchain import Block, Blockchain, Transaction, Header
 from networking import Address
 from utils import print_debug_info
 

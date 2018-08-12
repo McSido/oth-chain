@@ -31,7 +31,7 @@ class PeerManager(object):
 
         Args:
             send_queue: Queue for messaging other nodes.
-            gui_queue: Queue for interaction with the GUI
+            gui_queue: Queue for interaction with the gui
             port: Port of the node.
         """
         self._send_queue = send_queue

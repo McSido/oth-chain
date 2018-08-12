@@ -10,12 +10,12 @@ from queue import Queue
 import nacl.encoding
 import nacl.signing
 
-import pow_chain
+from chains import Transaction, Block, Header, PoW_Blockchain
 
 VERSION = 0.7
 
 
-class TestPOW():
+class TestPOW(object):
     """ Testcase used to bundle all tests for the
     Proof-Of-Work blockchain
     """
@@ -26,7 +26,7 @@ class TestPOW():
         self.sends = Queue()
 
         self.gui_queue = Queue()
-        self.blockchain = pow_chain.PoW_Blockchain(VERSION, self.sends, self.gui_queue)
+        self.blockchain = PoW_Blockchain(VERSION, self.sends, self.gui_queue)
 
         self.sender_sign = nacl.signing.SigningKey(seed=b'a' * 32)
         self.sender_verify = self.sender_sign.verify_key.encode(
@@ -41,17 +41,17 @@ class TestPOW():
         proof = self.blockchain.create_proof(self.sender_verify)
         block = self.blockchain.create_block(proof)
         mining_transaction = \
-            pow_chain.Transaction(sender='0',
-                                  recipient=self.sender_verify,
-                                  amount=50,
-                                  fee=0,
-                                  timestamp=time.time(),
-                                  signature='0')
+            Transaction(sender='0',
+                        recipient=self.sender_verify,
+                        amount=50,
+                        fee=0,
+                        timestamp=time.time(),
+                        signature='0')
 
         block.transactions.append(mining_transaction)
 
         root_hash = self.blockchain.create_merkle_root(block.transactions)
-        real_header = pow_chain.Header(
+        real_header = Header(
             block.header.version,
             block.header.index,
             block.header.timestamp,
@@ -59,7 +59,7 @@ class TestPOW():
             root_hash,
             block.header.proof
         )
-        real_block = pow_chain.Block(real_header, block.transactions)
+        real_block = Block(real_header, block.transactions)
 
         self.blockchain.new_block(real_block)
 
@@ -89,7 +89,7 @@ class TestPOW():
         self.mine_block()
 
         transaction = self.create_transaction()
-        transaction = pow_chain.Transaction(
+        transaction = Transaction(
             transaction.sender,
             transaction.recipient,
             transaction.amount,
@@ -151,15 +151,15 @@ class TestPOW():
         proof = self.blockchain.create_proof(self.sender_verify)
         block = self.blockchain.create_block(proof)
         block.transactions.append(
-            pow_chain.Transaction(sender='0',
-                                  recipient=self.sender_verify,
-                                  amount=50,
-                                  fee=0,
-                                  timestamp=time.time(),
-                                  signature='0'))
+            Transaction(sender='0',
+                        recipient=self.sender_verify,
+                        amount=50,
+                        fee=0,
+                        timestamp=time.time(),
+                        signature='0'))
 
         root_hash = self.blockchain.create_merkle_root(block.transactions)
-        real_header = pow_chain.Header(
+        real_header = Header(
             block.header.version,
             block.header.index,
             block.header.timestamp,
@@ -167,7 +167,7 @@ class TestPOW():
             root_hash,
             block.header.proof
         )
-        real_block = pow_chain.Block(real_header, block.transactions)
+        real_block = Block(real_header, block.transactions)
 
         self.blockchain.new_block(real_block)
         self.sends.get(timeout=1)  # Remove new_block message
@@ -185,7 +185,7 @@ class TestPOW():
 
         transaction_hash = self.create_transaction_hash(amount, fee, timestamp)
 
-        return pow_chain.Transaction(
+        return Transaction(
             self.sender_verify,
             self.receiver_verify,
             amount,

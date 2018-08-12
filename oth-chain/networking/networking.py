@@ -12,8 +12,8 @@ from pprint import pprint
 from queue import Empty, Queue
 from typing import Any, Tuple
 
-from ext_udp import ExtendedUDP
-from peers import PeerManager
+from .ext_udp import ExtendedUDP
+from .peers import PeerManager
 from utils import print_debug_info
 
 # (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
@@ -178,7 +178,7 @@ def worker(send_queue: Queue,
     # Main loop:
     # - check send_queue (send new messages)
     # - check incoming messages
-    #   -- Networking message (e.g. new peer, get peers)
+    #   -- networking message (e.g. new peer, get peers)
     #   -- Blockchain message: put on receive_queue
 
     SERVER.setup(port)
