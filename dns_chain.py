@@ -37,6 +37,13 @@ MAX_AUCTION_TIME = 5
 
 
 class DNSBlockChain(PoW_Blockchain):
+    """ Implementation of a DNS-'Server' atop of a Proof-of-Work blockchain.
+        Users can (given they have enough coins) register new domain -> ip address entries.
+        A User can update an entry, provided he is the owner of said entry.
+        Users can transfer domain names between one another (with a small fee),
+        or give up domain names for auction, at which point every user can bid on this
+        domain name, resulting in the domain being transferred to the highest bidder.
+    """
 
     def __init__(self,
                  version: float,
@@ -51,8 +58,11 @@ class DNSBlockChain(PoW_Blockchain):
 
     def new_transaction(self, transaction: Transaction):
         """ Add a new transaction to the blockchain.
-            If the receiver is 0, and the domain operation is 'transfer',
+            Overwrites new_transaction from blockchain.py
+            If the receiver is '0', and the domain operation is 'transfer',
             an auction for that domain is started.
+            If the receiver is '0', and the domain opeartion is 'b',
+            a bid for that domain is issued.
 
         Args:
             transaction: Transaction that should be added.
@@ -79,6 +89,13 @@ class DNSBlockChain(PoW_Blockchain):
             print_debug_info('Invalid transaction')
 
     def validate_transaction(self, transaction: Transaction, mining: bool = False) -> bool:
+        """ Validates a given transaction.
+            Overwrites validate_transaction from pow_chain.py.
+            Checks if a transaction is
+            1.) either a resolved auction or bid, and thus previously validated
+            2.) a valid domain operation (register, update, transfer, bid) or
+            3.) a valid 'normal' transaction
+        """
         normal_transaction = False
         valid_domain_operation = False
 
@@ -262,6 +279,12 @@ class DNSBlockChain(PoW_Blockchain):
         return processor
 
     def _resolve_domain_name(self, name: str) -> Tuple[Any, Any]:
+        """ Resolves a given domain name to its' corresponding ip_address as well as its' owner.
+            Returns an empty string for the ip if the domain_name is not yet registered,
+            or was recently transferred to another owner.
+            Args:
+                name: The domain_name
+        """
         for block_transaction in list(self.chain.values())[::-1]:
             for transaction in block_transaction[::-1]:
                 if transaction.data.domain_name == name:
@@ -272,10 +295,9 @@ class DNSBlockChain(PoW_Blockchain):
         return '', ''
 
     def _is_valid_domain_transaction(self, transaction: DNS_Transaction) -> bool:
-        """
-        Checks if a transaction is valid to perform considering already registered domain names
-        Args:
-            transaction: The transaction to be validated
+        """ Checks if a transaction is valid to perform considering already registered domain names
+            Args:
+                transaction: The transaction to be validated
         """
         if transaction.data.type == 'b':
             for auction_list in self.auctions.values():
@@ -296,6 +318,12 @@ class DNSBlockChain(PoW_Blockchain):
         return True
 
     def _auction(self, transaction: DNS_Transaction, index: int = 0):
+        """ Places a transaction with recipient '0' and domain operation type 'transfer'
+            into the auctions dict along with an initial 'bid', which returns the service fee
+            as well as the domain back to the owner.
+            Args:
+                transaction: The transaction initiating the auction
+        """
         # If no one bids on the transaction, the owner of the domain gets the fee and domain back
         bid_transaction = DNS_Transaction(
             '0', transaction.sender, transaction.fee, 1, time.time(), DNS_Data('', '', ''), '1'
@@ -309,6 +337,13 @@ class DNSBlockChain(PoW_Blockchain):
         self.auctions[i + MAX_AUCTION_TIME].append((transaction, bid_transaction))
 
     def _resolve_auction(self, auction: Tuple[DNS_Transaction, DNS_Transaction]):
+        """ Resolves an auction given through a  tuple of transactions by creating
+            two transactions 1) the transfer of the domain to the highest bidder and
+            2) the payment of the bid to the initiator of the auction.
+            These transactions are directly appended to the block currently being mined.
+            Args:
+                auction: Tuple of transactions [0]: auction, [1]: highest bid
+        """
         t1 = auction[0]  # original auction
         t2 = auction[1]  # highest bid
         domain = t1.data.domain_name
@@ -331,6 +366,13 @@ class DNSBlockChain(PoW_Blockchain):
         return [transfer_transaction, payment_transaction]
 
     def _bid(self, transaction: DNS_Transaction):
+        """ Takes a bid, finds the corresponding auction and replaces the last bid.
+            At this point it is already established that the new bid is higher than
+            the last. Also reimburses the sender of the last bid, by sending back the
+            amount of his bid.
+            Args:
+                transaction: The bid to be placed
+        """
         reimburse_transaction = None
         for auction_list in self.auctions.values():
             for i, auction in enumerate(auction_list):
