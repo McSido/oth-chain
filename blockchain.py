@@ -9,7 +9,7 @@ from pathlib import Path
 from pprint import pprint
 from queue import Queue
 from time import time
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
 from networking import Address
 from utils import print_debug_info
@@ -154,8 +154,9 @@ class Blockchain(object):
                 print_debug_info('Block not for current chain')
 
         if block.header in self.new_chain:
-            if self.validate_block(block, self.nc_latest_block()):
-                # Validate transactions only after full chain
+            if block.header.root_hash ==\
+                    self.create_merkle_root(block.transactions):
+                # Validate transactions<->header
                 self.new_chain[block.header] = block.transactions
 
                 for t in block.transactions:
@@ -167,12 +168,29 @@ class Blockchain(object):
 
                 # Check if new chain is finished
                 if not any(t is None for t in self.new_chain.values()):
+                    # Validate transactions
+                    old_data = next(iter(self.new_chain.items()))
+                    for h, t in self.new_chain.items():
+                        if h == old_data[0]:
+                            continue
+                        if self.validate_block(
+                                Block(h, t), Block(old_data[0], old_data[1])):
+                            old_data = (h, t)
+                        else:
+                            print_debug_info(
+                                'Invalid transaction in new chain')
+                            self.new_chain.clear()
+                            self.intermediate_transactions.clear()
+
                     self.send_queue.put(
                         ('new_header', self.nc_latest_header(), 'broadcast'))
                     self.chain = OrderedDict(self.new_chain)
                     self.new_chain.clear()
-                    self.transaction_pool = List(
-                        self.intermediate_transactions)
+                    # Remove mining transactions
+                    not_processed_transactions = [
+                        t for t in self.intermediate_transactions
+                        if t.sender != '0']
+                    self.transaction_pool = list(not_processed_transactions)
                     self.intermediate_transactions.clear()
 
             else:
@@ -331,7 +349,7 @@ class Blockchain(object):
         """
         return [Block(h, t) for h, t in self.chain.items()]
 
-    def get_block(self, header: Header) -> Block:
+    def get_block(self, header: Header) -> Optional[Block]:
         """ Get the block corresponding to the header
 
         Args:
@@ -340,7 +358,10 @@ class Blockchain(object):
         Returns:
             The block corresponding to the header
         """
-        return Block(header, self.chain[header])
+        try:
+            return Block(header, self.chain[header])
+        except KeyError:
+            return None
 
     def send_block(self, header: Header, address: Address):
         """ Send block corresponding to the header to the address
@@ -349,7 +370,9 @@ class Blockchain(object):
             header: Header of the block
             address: Address of the receiver
         """
-        self.send_queue.put(('new_block', self.get_block(header), address))
+        s_block = self.get_block(header)
+        if s_block and s_block.transactions:
+            self.send_queue.put(('new_block', s_block, address))
 
     @staticmethod
     def create_merkle_root(transactions: List[Transaction]) -> str:
