@@ -193,6 +193,12 @@ class Blockchain(object):
                     self.transaction_pool = list(not_processed_transactions)
                     self.intermediate_transactions.clear()
 
+                    # DNS specific
+                    try:
+                        self._sync_auctions()  # type: ignore
+                    except AttributeError:
+                        pass
+
             else:
                 print_debug_info('Block not for new chain')
 
