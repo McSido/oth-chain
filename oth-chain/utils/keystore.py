@@ -1,4 +1,4 @@
-import pickle
+import serializer
 
 from .utils import print_debug_info
 
@@ -9,8 +9,8 @@ def load_key(filename):
     Args:
         filename: Specifies the key file.
     """
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
+    with open(filename, 'r') as f:
+        return serializer.deserialize(f.read())
 
 
 def save_key(key, filename):
@@ -20,8 +20,8 @@ def save_key(key, filename):
         key: The key to be saved.
         filename: The filename of the saved key.
     """
-    with open(filename, 'wb') as f:
-        pickle.dump(key, f)
+    with open(filename, 'w') as f:
+        f.write(serializer.serialize(key))
 
 
 class Keystore:
@@ -33,21 +33,17 @@ class Keystore:
 
     def load(self):
         try:
-            with open(self.filename, 'rb') as file:
-                self.store = pickle.load(file)
+            with open(self.filename, 'r') as file:
+                self.store = serializer.deserialize(file.read())
         except FileNotFoundError:
             print_debug_info(f'File not found: {self.filename}')
-        except pickle.PickleError as e:
-            print_debug_info(f'Error with pickle: {e}')
         except EOFError as e:
             print_debug_info(f'Error with file: {e}')
 
     def save(self):
         try:
-            with open(self.filename, 'wb') as file:
-                pickle.dump(self.store, file)
-        except pickle.PickleError as e:
-            print_debug_info(f'Error with pickle {e}')
+            with open(self.filename, 'w') as file:
+                file.write(serializer.serialize(self.store))
         except OSError as e:
             print_debug_info(f'Error writing store to disk: {e}')
 

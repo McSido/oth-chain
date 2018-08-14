@@ -3,7 +3,6 @@
 import hashlib
 import math
 import os
-import pickle
 from collections import OrderedDict, namedtuple
 from pathlib import Path
 from pprint import pprint
@@ -13,6 +12,8 @@ from typing import Any, Callable, List, Optional
 
 from utils import print_debug_info
 from networking import Address
+
+import serializer
 
 Transaction = namedtuple('Transaction',
                          ['sender',
@@ -92,8 +93,8 @@ class Blockchain(object):
                 Path('bc_file.txt').is_file():
             print_debug_info(
                 'Load existing blockchain from file')
-            with open('bc_file.txt', 'rb') as bc_file:
-                self.chain = pickle.load(bc_file)
+            with open('bc_file.txt', 'r') as bc_file:
+                self.chain = serializer.deserialize(bc_file.read())
         else:
             # If file doesn't exist / is empty:
             # Create genesis block
@@ -104,9 +105,8 @@ class Blockchain(object):
         """ Save the current chain to the hard drive.
         """
         pprint('saving to file named bc_file.txt')
-        with open('bc_file.txt', 'wb') as output:
-            pickle.dump(self.chain, output,
-                        pickle.HIGHEST_PROTOCOL)
+        with open('bc_file.txt', 'w') as output:
+            output.write(serializer.serialize(self.chain))
 
     def new_transaction(self, transaction: Transaction):
         """ Add a new transaction to the blockchain.
@@ -382,7 +382,7 @@ class Blockchain(object):
 
     @staticmethod
     def create_merkle_root(transactions: List[Transaction]) -> str:
-        """ Calculate the merkle root of the transactions.
+        """ Calculate the Merkle root of the transactions.
 
 
         Args:
