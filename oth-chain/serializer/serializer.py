@@ -1,3 +1,17 @@
+""" Module used for serialization of the data used in the blockchain
+
+    The results are JSON-strings.
+    Use serialize() and deserialize().
+
+    The serialized data is built like this:
+        __<key>__: <value>
+
+    This usually means:
+        __type__: <Type of data>
+        __data__: <Data content>
+
+"""
+
 import json
 from collections import OrderedDict, namedtuple
 from pprint import pprint
@@ -9,14 +23,31 @@ import nacl.signing
 import chains
 
 
-def create_dict_named(obj: namedtuple):
+def create_dict_named(obj: namedtuple) -> dict:
+    """ Create a dict out of a namedtuple.
+
+    Args:
+        obj: Namedtuple.
+
+    Returns:
+        A dict containing the data.
+    """
     data = {'__type__': type(obj).__name__,
             '__data__': create_dict(obj._asdict())
             }
     return data
 
 
-def create_block_dict(h_dict, transactions):
+def create_block_dict(h_dict: dict, transactions: list) -> dict:
+    """ Create a dict describing a block.
+
+    Args:
+        h_dict: Serialized header.
+        transactions: Serialized list of transaction.
+
+    Returns:
+        A dict containing the block data.
+    """
     data = {
         '__type__': 'Block',
         '__header__': h_dict,
@@ -24,7 +55,15 @@ def create_block_dict(h_dict, transactions):
     return data
 
 
-def create_dict(obj: Any):
+def create_dict(obj: Any) -> dict:
+    """ Create a dict out of an object.
+
+    Args:
+        obj: Object to process.
+
+    Returns:
+        Dict containing the data of the object.
+    """
     if isinstance(obj, chains.Block):
         h_dict = create_dict(obj.header)
         transactions = create_dict(obj.transactions)
@@ -84,12 +123,28 @@ def create_dict(obj: Any):
     return data
 
 
-def serialize(obj: Any):
+def serialize(obj: Any)->str:
+    """ Serialize the different objects of the blockchain.
+
+    Args:
+        obj: Object to serialize.
+
+    Returns:
+        JSON string of the object.
+    """
     data = create_dict(obj)
     return json.dumps(data)
 
 
 def create_object(data: dict):
+    """ Create an object out of a dict.
+
+    Args:
+        data: Dictionary containing the data.
+
+    Returns:
+        Object that was created.
+    """
     if isinstance(data, list):
         return [create_object(e) for e in data]
 
@@ -132,13 +187,13 @@ def create_object(data: dict):
 
 
 def deserialize(str_data: str):
-    """ Deserializes the different objects of the blockchain
+    """ Deserializes the different objects of the blockchain.
 
     Args:
-        data: JSON representation of data
+        str_data: JSON representation of data.
 
     Returns:
-        blockchain object
+        Deserialized object.
     """
     data = json.loads(str_data)
     return create_object(data)

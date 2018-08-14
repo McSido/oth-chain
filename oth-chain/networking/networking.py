@@ -11,12 +11,11 @@ from pprint import pprint
 from queue import Empty, Queue
 from typing import Any, Tuple
 
+import serializer
+from utils import print_debug_info
+
 from .ext_udp import ExtendedUDP
 from .peers import PeerManager
-from utils import print_debug_info
-import serializer
-
-# (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
 
 Address = Tuple[str, int]
 
