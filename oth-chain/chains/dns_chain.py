@@ -88,7 +88,7 @@ class DNSBlockChain(PoW_Blockchain):
         else:
             print_debug_info('Invalid transaction')
 
-    def validate_transaction(self, transaction: Transaction, mining: bool = False) -> bool:
+    def validate_transaction(self, transaction: DNS_Transaction, mining: bool = False) -> bool:
         """ Validates a given transaction.
             Overwrites validate_transaction from pow_chain.py.
             Checks if a transaction is
@@ -137,7 +137,7 @@ class DNSBlockChain(PoW_Blockchain):
             validate_hash = hashlib.sha256(
                 (str(transaction.sender) + str(transaction.recipient) +
                  str(transaction.amount) + str(transaction.fee) +
-                 str(transaction.data) + str(transaction.timestamp)).encode()
+                 str(transaction.timestamp) + str(transaction.data)).encode()
             ).hexdigest()
 
             if validate_hash == transaction_hash:
