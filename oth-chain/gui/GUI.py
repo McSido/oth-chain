@@ -21,6 +21,14 @@ from queue import Queue
 
 
 def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keystore):
+    """ Main function of the GUI thread, creates the GUI, passes the queues to it, and
+        starts the execution.
+        Args:
+            gui_queue: Queue for messages addressed to the GUI
+            chain_queue: Queue for messages addressed to the blockchain
+            command_queue: Queue for commands to the core thread.
+            keystore: Keystore object, obtained from core
+    """
     app = QApplication(sys.argv)
     ex = ChainGUI(keystore)
     ex.initUI(chain_queue, gui_queue, command_queue)
@@ -29,6 +37,11 @@ def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keys
 
 
 class ChainGUI(QMainWindow):
+    """ Provides a graphical user interface for inspecting
+        and interacting with the blockchain.
+        Args:
+            keystore: The keystore to manage public keys of other clients
+    """
 
     def __init__(self, keystore: Keystore):
         super(ChainGUI, self).__init__()
@@ -37,6 +50,13 @@ class ChainGUI(QMainWindow):
         self.keystore = keystore
 
     def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
+        """ Initialises the ui and sets the queues.
+            Starts the thread for receiving messages.
+            Args:
+                chain_queue: Queue for messages addressed to the blockchain
+                gui_queue: Queue for messages addressed to the GUI
+                command_queue: Queue for commands to the core thread
+        """
         self.splitter = QSplitter()
         self.chain_queue = chain_queue
         self.gui_queue = gui_queue
@@ -55,6 +75,9 @@ class ChainGUI(QMainWindow):
         message_thread.start()
 
     def wait_for_message(self):
+        """ Thread function for receiving messages from the gui_queue.
+            Receives messages and calls the appropriate functions.
+        """
         while True:
             msg_type, msg_data, msg_address = self.gui_queue.get(block=True)
             if msg_type == 'new_block':
@@ -77,11 +100,18 @@ class ChainGUI(QMainWindow):
                 self.splitter.widget(1).update_balance(msg_data)
 
     def closeEvent(self, a0: QtGui.QCloseEvent):
+        """ Event that gets called on hitting the close-button of the GUI.
+            Sends an exit command to the core, terminating the program.
+        """
         self.command_queue.put('exit')
         a0.accept()
 
 
 class TabWidget(QWidget):
+    """ Widget that holds multiple tabs, for better overview.
+        Args:
+            parent: The parent widget.
+    """
 
     def __init__(self, parent: QWidget):
         super(TabWidget, self).__init__(parent)
@@ -101,6 +131,10 @@ class TabWidget(QWidget):
 
 
 class ChainHistoryWidget(QWidget):
+    """ Widget that displays the blockchain in a treelike fashion.
+        Args:
+            parent: The parent widget.
+    """
 
     def __init__(self, parent: QWidget):
         super(ChainHistoryWidget, self).__init__(parent)
@@ -127,6 +161,10 @@ class ChainHistoryWidget(QWidget):
         self.setLayout(self.layout)
 
     def load_data(self, data: tuple):
+        """ Loads data (blocks, transactions) from a dump into the tree widget.
+            Args:
+                data: Tuple: [0] the chain dict, [1] the current transaction pool
+        """
 
         self.chain = data[0]
         self.transaction_pool = data[1]
@@ -137,6 +175,10 @@ class ChainHistoryWidget(QWidget):
             self.add_transaction_pool_item(transaction)
 
     def add_tree_item(self, block: Block):
+        """ Adds a new block to the tree widget.
+            Args:
+                block: The block to be added.
+        """
         item = QTreeWidgetItem()
         item.setText(0, 'Block')
         item.setText(1, '#' + str(block.header.index))
@@ -162,35 +204,26 @@ class ChainHistoryWidget(QWidget):
         transactions.setText(0, 'Transactions:')
         item.addChild(transactions)
         for i, transaction in enumerate(block.transactions):
-            t = QTreeWidgetItem()
-            t.setText(0, 'Transaction')
-            t.setText(1, '#' + str(i))
-            sender = QTreeWidgetItem()
-            sender.setText(0, 'Sender:')
-            sender.setText(1, str(transaction.sender))
-            recipient = QTreeWidgetItem()
-            recipient.setText(0, 'Recipient:')
-            recipient.setText(1, str(transaction.recipient))
-            amount = QTreeWidgetItem()
-            amount.setText(0, 'Amount:')
-            amount.setText(1, str(transaction.amount))
-            fee = QTreeWidgetItem()
-            fee.setText(0, 'Fee:')
-            fee.setText(1, str(transaction.fee))
-            t_timestamp = QTreeWidgetItem()
-            t_timestamp.setText(0, 'Timestamp:')
-            t_timestamp.setText(1, str(time.strftime("%d.%m.%Y %H:%M:%S %Z",
-                                                     time.gmtime(transaction.timestamp))))
-            signature = QTreeWidgetItem()
-            signature.setText(0, 'Signature')
-            signature.setText(1, str(transaction.signature))
-            t.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
+            t = self.create_transaction_item(transaction, i)
             transactions.addChild(t)
 
     def add_transaction_pool_item(self, transaction: Transaction):
+        """ Adds a new transaction to the transaction pool.
+            Args:
+                transaction: the transaction to add.
+        """
+        item = self.create_transaction_item(transaction, self.transaction_pool_item.childCount())
+        self.transaction_pool_item.insertChild(0, item)
+
+    def create_transaction_item(self, transaction: Transaction, number: int) -> QTreeWidgetItem:
+        """ Takes a transaction object and builds an item for the tree widget from it.
+            Args:
+                transaction: the transaction object.
+                number: the index of the transaction.
+        """
         item = QTreeWidgetItem()
         item.setText(0, 'Transaction')
-        item.setText(1, '#' + str(self.transaction_pool_item.childCount()))
+        item.setText(1, '#' + str(number))
         sender = QTreeWidgetItem()
         sender.setText(0, 'Sender:')
         sender.setText(1, str(transaction.sender))
@@ -211,13 +244,22 @@ class ChainHistoryWidget(QWidget):
         signature.setText(0, 'Signature')
         signature.setText(1, str(transaction.signature))
         item.addChildren([sender, recipient, amount, fee, t_timestamp, signature])
-        self.transaction_pool_item.insertChild(0, item)
+        return item
 
     def new_block(self, block: Block):
+        """ Calls the functions to add a new block and clear the transaction pool.
+            Args:
+                block: the block to be added
+        """
         self.add_tree_item(block)
         self.clear_transaction_pool(block.transactions)
 
     def clear_transaction_pool(self, transaction_list: list):
+        """ Takes a list of transactions and removes all
+            items in the list from the transaction pool.
+            Args:
+                transaction_list: list of transaction contained in the latest block.
+        """
         items_to_delete = []
         for transaction in transaction_list:
             timestamp = time.strftime("%d.%m.%Y %H:%M:%S %Z",
@@ -231,8 +273,12 @@ class ChainHistoryWidget(QWidget):
 
 
 class PeerWidget(QWidget):
+    """ Widget that displays the peers of the network.
+        Args:
+            parent: The parent widget
+    """
 
-    def __init__(self, parent):
+    def __init__(self, parent: QWidget):
         super(PeerWidget, self).__init__(parent)
         self.layout = QVBoxLayout()
 
@@ -253,6 +299,11 @@ class PeerWidget(QWidget):
         self.setLayout(self.layout)
 
     def update_peers(self, typ, address):
+        """ Updates the tree widget of the peers.
+            Args:
+                typ: the type of change to the peer list.
+                address: the ip address of the peer that has changed state.
+        """
         if typ == 'inferred':
             item = QTreeWidgetItem()
             item.setText(0, 'Address:')
@@ -291,6 +342,11 @@ class PeerWidget(QWidget):
 
 
 class KeystoreWidget(QWidget):
+    """ Widget to display and manage the public keys
+        of other clients in the network.
+        Args:
+            parent: the parent widget
+    """
 
     def __init__(self, parent: QWidget):
         super(KeystoreWidget, self).__init__(parent)
@@ -335,6 +391,11 @@ class KeystoreWidget(QWidget):
         self.setLayout(self.layout)
 
     def set_item(self, item: QStandardItem):
+        """ Checks if an item is checked or not, and adds/removes it
+            to/from the list of checked items
+            Args:
+                item: the item that changed its' state
+        """
         if item.checkState() == QtCore.Qt.Checked:
             self.checked_items.append(item)
         elif item.checkState() == QtCore.Qt.Unchecked:
@@ -344,6 +405,8 @@ class KeystoreWidget(QWidget):
                 pass
 
     def delete_keys(self):
+        """ Deletes all checked items from the keystore.
+        """
         self.checked_items.sort(key=lambda x: x.row())
         for item in self.checked_items[::-1]:
             key = item.text().split(':')[0]
@@ -352,12 +415,16 @@ class KeystoreWidget(QWidget):
         self.checked_items = []
 
     def load_data(self):
+        """ Loads all keys from the keystore, when initiated.
+        """
         for key, value in self.keystore.store.items():
             item = QStandardItem(f'{key}: {str(value)}')
             item.setCheckable(True)
             self.model.appendRow(item)
 
     def get_key_file(self):
+        """ Opens a file dialog to get the file name of a public key file
+        """
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         self.import_key_file_name, _ = QFileDialog.getOpenFileName(self, 'Select key file', '',
@@ -365,6 +432,8 @@ class KeystoreWidget(QWidget):
         self.import_key_file_explorer.setText(self.import_key_file_name)
 
     def import_key(self):
+        """ Imports/Updates a key into the keystore
+        """
         key_name = self.import_key_name_edit.text()
         key, success = self.keystore.add_key(key_name, self.import_key_file_name)
         if not success:
@@ -382,6 +451,12 @@ class KeystoreWidget(QWidget):
 
 
 class TransactionWidget(QWidget):
+    """ Widget for interacting with the chain.
+        Contains ways to change the current user, create transactions
+        or start mining new blocks.
+        Args:
+            parent: the parent widget.
+    """
 
     def __init__(self, parent: QWidget):
         super(TransactionWidget, self).__init__(parent)
@@ -461,13 +536,19 @@ class TransactionWidget(QWidget):
         self.setLayout(self.layout)
 
     def mine(self):
+        """ Send a mine message to the blockchain
+        """
         self.chain_queue.put(('mine', self.verify_key_hex, 'local'))
 
     def update_fee(self):
+        """ Updates the fee label based on the transaction amount
+        """
         fee = math.ceil(self.amount_edit.value() * 0.05)
         self.fee_label.setText(f'Fee: {fee}')
 
     def send_transaction(self):
+        """ Creates a transaction and sends a new_transaction message to the chain.
+        """
         self.error_label.hide()
         recipient = self.keystore.resolve_name(self.recipient_edit.text())
         if recipient == 'Error':
@@ -501,6 +582,8 @@ class TransactionWidget(QWidget):
                               ))
 
     def load_signing_key(self):
+        """ Loads a private key, to change the current user.
+        """
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         file_name, _ = QFileDialog.getOpenFileName(self, 'Select key file', '',
@@ -511,6 +594,8 @@ class TransactionWidget(QWidget):
         self.update_signing_key(key)
 
     def save_signing_key(self):
+        """ Saves the private key to a file.
+        """
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         file_name, _ = QFileDialog.getSaveFileName(self, 'Save key file', '',
@@ -520,6 +605,8 @@ class TransactionWidget(QWidget):
         save_key(self.signing_key, file_name)
 
     def export_verify_key(self):
+        """ Exports the public key generated from the private key to a file.
+        """
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         file_name, _ = QFileDialog.getSaveFileName(self, 'Save key file', '',
@@ -529,15 +616,25 @@ class TransactionWidget(QWidget):
         save_key(self.verify_key_hex, file_name)
 
     def update_signing_key(self, key: nacl.signing.SigningKey):
+        """ Updates the private key with a key from a previously loaded file.
+            Args:
+                key: The new private key.
+        """
         self.signing_key = key
         verify_key = self.signing_key.verify_key
         self.verify_key_hex = verify_key.encode(nacl.encoding.HexEncoder)
         self.user_field.setText(str(self.verify_key_hex))
 
     def update_balance(self, balance: int):
+        """ Updates the balance when a new block is received.
+            Args:
+                balance: The new balance of the current user.
+        """
         self.balance_label.setText(f'Current Balance: {balance}')
 
     def request_balance(self):
+        """ Sends a print_balance message to the chain.
+        """
         self.chain_queue.put(('print_balance',
                               (self.verify_key_hex, time.time()),
                               'gui'))
