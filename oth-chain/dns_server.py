@@ -6,10 +6,10 @@ import dnslib.server
 from dnslib import RR, DNSRecord, RCODE
 from queue import Queue
 from typing import Any
-from .chains import DNSBlockChain
-from .networking import Address, worker
-from .utils import print_debug_info, set_debug
-from . import core
+from chains import DNSBlockChain
+from networking import Address, worker
+from utils import print_debug_info, set_debug
+import core
 
 dns_queue: Queue = Queue()
 
