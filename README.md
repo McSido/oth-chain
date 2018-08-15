@@ -2,6 +2,9 @@
 
 [![Build Status](https://travis-ci.org/McSido/oth-chain.svg?branch=master)](https://travis-ci.org/McSido/oth-chain)
 [![CodeFactor](https://www.codefactor.io/repository/github/mcsido/oth-chain/badge)](https://www.codefactor.io/repository/github/mcsido/oth-chain)
+[![codecov](https://codecov.io/gh/McSido/oth-chain/branch/master/graph/badge.svg)](https://codecov.io/gh/McSido/oth-chain)
+
+
 
 ## Instructions
 
@@ -9,8 +12,9 @@
 
 * NaCl (Cryptography)
 * PyQT5 (GUI)
+* dnslib (DNS-Server)
 
-```
+```SHELL
 pip install -r requirements.txt
 ```
 
@@ -77,10 +81,11 @@ Internal communication (between threads) of the blockchain is handled via two Qu
 
 ### Networking protocol
 
-Messages are serialized via pythons _pickle_ module \
-Messages contain a message-type and message-data
+Messages are serialized as JSON \
+Messages contain a message-type and message-data \
+[Further information](./documentation/protocol.md)
 
 ### Tests
 
 For testing run pytest -v\
-Additional stress-tests are in  [stress-test.py](./stress-test.py)
+OUTDATED: Additional stress-tests are in [stress-test.py](./stress-test.py)

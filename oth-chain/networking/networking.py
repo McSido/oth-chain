@@ -5,18 +5,17 @@ in the blockchain network, as well as interpret incoming messages
 """
 
 
-import pickle  # change for secure solution
 import sys
 import time
 from pprint import pprint
 from queue import Empty, Queue
 from typing import Any, Tuple
 
-from .ext_udp import ExtendedUDP
-from .peers import PeerManager
+import serializer
 from utils import print_debug_info
 
-# (https://docs.python.org/3/library/pickle.html?highlight=pickle#module-pickle)
+from .ext_udp import ExtendedUDP
+from .peers import PeerManager
 
 Address = Tuple[str, int]
 
@@ -59,7 +58,7 @@ def unpack_msg(msg: bytes) -> Tuple[str, Any]:
     Returns:
         Unpacked message.
     """
-    return pickle.loads(msg)
+    return serializer.deserialize(msg.decode('utf-8'))
 
 
 def pack_msg(msg: Tuple[str, Any]) -> bytes:
@@ -71,7 +70,7 @@ def pack_msg(msg: Tuple[str, Any]) -> bytes:
     Returns:
         Packed message.
     """
-    return pickle.dumps(msg)
+    return serializer.serialize(msg).encode('utf-8')
 
 
 def process_incoming_msg(msg: bytes, in_address: Address,
