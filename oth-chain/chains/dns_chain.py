@@ -104,7 +104,7 @@ class DNSBlockChain(PoW_Blockchain):
         if transaction.sender == '0' and transaction.signature == '1':
             return True
 
-        if transaction.data.type not in 'burt':
+        if transaction.data.type == '':
             normal_transaction = True
             if transaction.amount == 0:
                 return False
