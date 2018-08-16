@@ -13,7 +13,7 @@ DDosHeader = namedtuple('DDosHeader',
 DDosTransaction = namedtuple('DDosTransaction',
                              ['sender',
                               'timestamp',
-                              'data'
+                              'data',
                               'signature'])
 
 DDosData = namedtuple('DDosData',
