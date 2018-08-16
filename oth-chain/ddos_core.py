@@ -162,6 +162,15 @@ def main(argv):
         elif command == 'peers':
             core.networker_command_queue.put('print_peers')
 
+        elif re.fullmatch(r'key \w+', command):
+            try:
+                t = command.split(' ')
+                keystore.save_key(signing_key, t[1])
+                print('Key saved successfully')
+            except Exception as e:
+                print('Could not save key')
+                print(e)
+
         elif re.fullmatch(r'export \w+', command):
             try:
                 print('Exporting public key')
@@ -234,6 +243,10 @@ def main(argv):
         elif re.fullmatch(r'purge \w+', command):
             # Uninvite + unblock all ip's of user
             pass  # Create transaction
+        elif re.fullmatch(r'children', command):
+            core.receive_queue.put(('show_children',
+                                    str(verify_key_hex),
+                                    'local'))
 
 
 if __name__ == "__main__":

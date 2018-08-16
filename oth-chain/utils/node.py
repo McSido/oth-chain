@@ -114,3 +114,9 @@ class Node(object):
         ancestors = [self.parent]
         ancestors += self.parent.get_ancestors()
         return ancestors
+
+    def print(self, indent=0):
+        """ Prints the node and all its children """
+        print('|' + '-'*indent + self.content)
+        for child in self.children:
+            child.print(indent + 1)
