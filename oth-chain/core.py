@@ -277,7 +277,7 @@ keystore
                 export <filename> : Exports one own public key to file\
 <filename>
                 save: Save blockchain to bc_file.txt
-                exit: exits programm
+                exit: exits program
                 """)
             print(help_str)
             if dns:
