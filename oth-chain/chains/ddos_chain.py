@@ -38,9 +38,10 @@ class DDosChain(Blockchain):
         self.tree = Node('Root')
         self.tree.add_child(Node(str(
             "ab2a248087095ef9e84a900337fac41cf2d588e9017b345f1c90a4bb0844ed28".encode('utf-8'))))
+        self.blocked_ips: Dict[str, Node] = {}
 
     def get_ips(self):
-        pass
+        return list(self.blocked_ips.keys())
 
     def load_chain(self):
         pass
@@ -49,21 +50,69 @@ class DDosChain(Blockchain):
         if not self.validate_transaction(transaction):
             print_debug_info('Invalid transaction')
             return
+
+        # INVITE
         if transaction.data.type == 'i':
             if str(transaction.data.data) in self.tree:
                 return
             new_node = Node(str(transaction.data.data))
             parent = self.tree.get_node_by_content(str(transaction.sender))
             parent.add_child(new_node)
+
+        # UNINVITE
         elif transaction.data.type == 'ui':
             if str(transaction.data.data) not in self.tree:
                 return
-            node_to_remove = self.tree.get_node_by_content(str(transaction.data.data))
-            sender_node = self.tree.get_node_by_content(str(transaction.sender))
+            node_to_remove = self.tree.get_node_by_content(
+                str(transaction.data.data))
+            sender_node = self.tree.get_node_by_content(
+                str(transaction.sender))
             if node_to_remove.content not in sender_node:
                 print_debug_info('No permission to delete this node!')
                 return
             self.tree.remove_node(node_to_remove, False)
+
+        # BLOCK IP
+        elif transaction.data.type == 'b':
+            if transaction.data.data in self.blocked_ips:
+                ancestors = self.blocked_ips[transaction.data.data].\
+                    get_ancestors()
+                if (str(transaction.sender) in [a.content for a in ancestors]):
+                    # Escalate blocked-IP to ancestor
+                    for a in ancestors:
+                        if a.content == str(transaction.sender):
+                            self.blocked_ips[transaction.data.data] = a
+                            break
+                else:
+                    print_debug_info('IP was already blocked')
+                    return
+            else:
+                self.blocked_ips[transaction.data.data] =\
+                    self.tree.get_node_by_content(
+                    str(transaction.sender))
+
+        # UNBLOCK IP
+        elif transaction.data.type == 'ub':
+            if transaction.data.data in self.blocked_ips:
+                if str(transaction.sender) ==\
+                        self.blocked_ips[transaction.data.data].content:
+                    del(self.blocked_ips[transaction.data.data])
+                    return
+
+                ancestors = self.blocked_ips[transaction.data.data].\
+                    get_ancestors()
+                if (str(transaction.sender) in [a.content for a in ancestors]):
+                    # IP blocked from descendant
+                    del(self.blocked_ips[transaction.data.data])
+                    return
+                else:
+                    print_debug_info('IP was already blocked')
+                    return
+
+            else:
+                print_debug_info('Trying to unblock IP that was not blocked')
+                return
+        # PURGE
         elif transaction.data.type == 'p':
             pass
 
@@ -160,7 +209,13 @@ class DDosChain(Blockchain):
         # DDOS
 
         def get_ips_inner(msg_data: Any, msg_address: Address):
-            pass
+            if msg_address == 'local':
+                pprint(self.get_ips())
+            elif msg_address == 'daemon':
+                # Write to disk
+                pass
+            else:
+                return
 
         def show_children(msg_data: Any, msg_address: Address):
             if not msg_address == 'local':
