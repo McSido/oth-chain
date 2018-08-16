@@ -3,13 +3,14 @@ import re
 import sys
 import threading
 import socket
+import time
 
 import nacl.encoding
 import nacl.signing
 import nacl.utils
 
 import core
-from chains import DDosChain
+from chains import DDosChain, DDosTransaction, DDosData
 from utils import keystore, set_debug
 
 
@@ -94,6 +95,26 @@ def init(port: int, signing_key):
     return signing_key, verify_key_hex, networker, blockchain_thread
 
 
+def create_transaction(sender: str,
+                       timestamp: int,
+                       data: DDosData,
+                       signing_key: nacl.signing.SigningKey)\
+        -> DDosTransaction:
+    hash_str = (str(sender) +
+                str(data) +
+                str(timestamp))
+    transaction_hash = DDosChain.hash(hash_str)
+
+    transaction = DDosTransaction(
+        sender,
+        timestamp,
+        data,
+        signing_key.sign(transaction_hash.encode())
+    )
+
+    return transaction
+
+
 def main(argv):
     """ Main function of the program.
 
@@ -153,36 +174,62 @@ def main(argv):
             core.receive_queue.put(('get_ips', '', 'local'))
 
         elif re.fullmatch(r'invite \w+', command):
-            pass  # Create transaction
+            t = command.split(' ')
+            timestamp = time.time()
+            transaction = create_transaction(verify_key_hex, timestamp,
+                                             DDosData('i', t[1]), signing_key)
+            core.receive_queue.put(('new_transaction',
+                                    transaction,
+                                    'local'
+                                    ))
 
         elif re.fullmatch(r'uninvite \w+', command):
-            pass  # Create transaction
+            t = command.split(' ')
+            timestamp = time.time()
+            transaction = create_transaction(verify_key_hex, timestamp,
+                                             DDosData('ui', t[1]), signing_key)
+            core.receive_queue.put(('new_transaction',
+                                    transaction,
+                                    'local'
+                                    ))
 
         elif re.fullmatch(r'block \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
                           command):
             t = command.split(' ')
             valid_ip = True
             try:
-                socket.inet_aton(t[2])
+                socket.inet_aton(t[1])
             except OSError:
                 valid_ip = False
             if not valid_ip:
                 print('Not a valid ip')
                 continue
-            pass  # Create transaction
+            timestamp = time.time()
+            transaction = create_transaction(verify_key_hex, timestamp,
+                                             DDosData('b', t[1]), signing_key)
+            core.receive_queue.put(('new_transaction',
+                                    transaction,
+                                    'local'
+                                    ))
 
         elif re.fullmatch(r'unblock \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
                           command):
             t = command.split(' ')
             valid_ip = True
             try:
-                socket.inet_aton(t[2])
+                socket.inet_aton(t[1])
             except OSError:
                 valid_ip = False
             if not valid_ip:
                 print('Not a valid ip')
                 continue
-            pass  # Create transaction
+            timestamp = time.time()
+            transaction = create_transaction(verify_key_hex, timestamp,
+                                             DDosData('ub', t[1]), signing_key)
+            core.receive_queue.put(('new_transaction',
+                                    transaction,
+                                    'local'
+                                    ))
 
         elif re.fullmatch(r'purge \w+', command):
             # Uninvite + unblock all ip's of user
