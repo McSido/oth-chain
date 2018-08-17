@@ -27,6 +27,8 @@ DDosData = namedtuple('DDosData',
                       ['type',
                        'data'])
 
+IP_LIST_FILE_NAME = 'Blacklist.txt'
+
 
 class DDosChain(Blockchain):
 
@@ -42,6 +44,10 @@ class DDosChain(Blockchain):
 
     def get_ips(self):
         return list(self.blocked_ips.keys())
+
+    def save_ips_to_file(self):
+        with open(IP_LIST_FILE_NAME, 'w') as f:
+            f.writelines(self.blocked_ips.keys())
 
     def load_chain(self):
         pass
@@ -114,7 +120,24 @@ class DDosChain(Blockchain):
                 return
         # PURGE
         elif transaction.data.type == 'p':
-            pass
+            if str(transaction.data.data) not in self.tree:
+                return
+            node_to_remove = self.tree.get_node_by_content(
+                str(transaction.data.data))
+            sender_node = self.tree.get_node_by_content(
+                str(transaction.sender))
+            if node_to_remove.content not in sender_node:
+                print_debug_info('No permission to delete this node!')
+                return
+            self.tree.remove_node(node_to_remove, False)
+            index_list = []
+            # Remove all ips blocked from this client
+            for i, t in enumerate(self.blocked_ips.items()):
+                blocker = t[1]
+                if blocker == node_to_remove.content:
+                    index_list.append(i)
+            for index in index_list:
+                del(self.blocked_ips[index])
 
         self.transaction_pool.append(transaction)
         self.send_queue.put(('new_transaction', transaction, 'broadcast'))
@@ -212,8 +235,7 @@ class DDosChain(Blockchain):
             if msg_address == 'local':
                 pprint(self.get_ips())
             elif msg_address == 'daemon':
-                # Write to disk
-                pass
+                self.save_ips_to_file()
             else:
                 return
 
