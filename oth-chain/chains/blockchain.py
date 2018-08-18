@@ -224,26 +224,53 @@ class Blockchain(object):
             print_debug_info('Invalid header')
 
     def validate_header(self, header: Header, last_header: Header) -> bool:
-        """ Validate a header.
-
-        Abstract function!
+        """ Validates a block-header.
 
         Args:
             header: Header that should be validated
             last_header: Header of current last block.
         """
-        raise NotImplementedError
+
+        # check if previous block == last_block
+        if header.previous_hash != last_header.root_hash:
+            return False
+
+        # check order of time
+        if header.timestamp < last_header.timestamp:
+            return False
+
+        # Check that version of the block can be processed
+        if header.version > self.version:
+            print_debug_info(f'Received block with version {header.version},' +
+                             ' but your current version is {self.version}.\n' +
+                             'Check if there is a newer version available.')
+            return False
+
+        return True
 
     def validate_block(self, block: Block, last_block: Block) -> bool:
         """ Validate a block.
 
-        Abstract function!
+        Does only validate basic things.
+        Override this function if needed
 
         Args:
             block: Block that should be validated
             last_block: Current last block.
+
+        Returns:
+            The validity (True/False) of the block
         """
-        raise NotImplementedError
+        # check if the header of the block is valid
+        if not self.validate_header(block.header, last_block.header):
+            return False
+
+        # Check if hash is valid
+        if not self.create_merkle_root(block.transactions) ==\
+                block.header.root_hash:
+            return False
+
+        return True
 
     def validate_transaction(self, transaction: Transaction):
         """ Validate a transaction.

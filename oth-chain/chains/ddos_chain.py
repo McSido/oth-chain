@@ -6,6 +6,7 @@ from collections import namedtuple
 from typing import Any, List, Tuple, Callable, Dict
 from queue import Queue
 from pprint import pprint
+from time import time
 
 import nacl.signing
 import nacl.encoding
@@ -50,14 +51,12 @@ class DDosChain(Blockchain):
             f.writelines(self.blocked_ips.keys())
 
     def load_chain(self):
-        pass
+        # TODO: load from file
 
-    def new_transaction(self, transaction: DDosTransaction):
-        if not self.validate_transaction(transaction):
-            print_debug_info('Invalid transaction')
-            return
+        self.chain[DDosHeader(0, 0, 768894480, 0, 0)] = []
 
-        # INVITE
+    def process_transaction(self, transaction: DDosTransaction):
+                # INVITE
         if transaction.data.type == 'i':
             if str(transaction.data.data) in self.tree:
                 return
@@ -139,19 +138,49 @@ class DDosChain(Blockchain):
             for index in index_list:
                 del(self.blocked_ips[index])
 
+    def new_transaction(self, transaction: DDosTransaction):
+        if not self.validate_transaction(transaction):
+            print_debug_info('Invalid transaction')
+            return
+
+        if transaction in self.transaction_pool:
+            print_debug_info('Transaction already in pool')
+            return
+
         self.transaction_pool.append(transaction)
         self.send_queue.put(('new_transaction', transaction, 'broadcast'))
+        if len(self.transaction_pool) >= 5:
+            self.new_block(self.create_block(self.create_proof(b'0')))
+
+    def process_block(self, block: Block):
+        for transaction in block.transactions:
+            self.process_transaction(transaction)
+            # Remove from pool
+            try:
+                self.transaction_pool.remove(transaction)
+            except ValueError:
+                pass
 
     def new_block(self, block: Block):
-        pass
+        # Main chain
+        if self.validate_block(block, self.latest_block()):
+            self.process_block(block)
+            self.chain[block.header] = block.transactions
+            self.send_queue.put(('new_block', block, 'broadcast'))
+        else:
+            print_debug_info('Block not for main chain')
 
     def validate_block(self, block: Block, last_block: Block) -> bool:
-        pass
+        if not super().validate_block(block, last_block):
+            return False
+
+        return all(self.validate_transaction(t) for t in block.transactions)
 
     def validate_transaction(self, transaction: DDosTransaction):
         if not str(transaction.sender) in self.tree:
             print_debug_info('Sender could not be found in invited clients.')
             return False
+
         try:
             verify_key = nacl.signing.VerifyKey(
                 transaction.sender, encoder=nacl.encoding.HexEncoder)
@@ -161,6 +190,8 @@ class DDosChain(Blockchain):
                         str(transaction.data) +
                         str(transaction.timestamp))
             validate_hash = self.hash(hash_str)
+
+            # Validate right management
 
             if validate_hash == transaction_hash:
                 print_debug_info('Signature OK')
@@ -173,10 +204,20 @@ class DDosChain(Blockchain):
             return False
 
     def create_block(self, proof: Any) -> Block:
-        pass
+        header = DDosHeader(self.version,
+                            len(self.chain),
+                            time(),
+                            self.latest_block().header.root_hash,
+                            self.create_merkle_root(self.transaction_pool)
+                            )
+
+        block = Block(header,
+                      list(self.transaction_pool))
+
+        return block
 
     def create_proof(self, miner_key: bytes) -> Any:
-        pass
+        return 0
 
     def resolve_conflict(self, new_chain: List[DDosHeader]):
         pass
@@ -262,8 +303,3 @@ class DDosChain(Blockchain):
             commands[msg_type](msg_data, msg_address)
 
         return processor
-
-    def validate_header(self,
-                        header: DDosHeader,
-                        last_header: DDosHeader) -> bool:
-        pass

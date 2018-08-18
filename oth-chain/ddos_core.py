@@ -186,7 +186,9 @@ def main(argv):
             t = command.split(' ')
             timestamp = time.time()
             transaction = create_transaction(verify_key_hex, timestamp,
-                                             DDosData('i', t[1]), signing_key)
+                                             DDosData('i',
+                                                      t[1].encode('utf-8')),
+                                             signing_key)
             core.receive_queue.put(('new_transaction',
                                     transaction,
                                     'local'
@@ -196,7 +198,9 @@ def main(argv):
             t = command.split(' ')
             timestamp = time.time()
             transaction = create_transaction(verify_key_hex, timestamp,
-                                             DDosData('ui', t[1]), signing_key)
+                                             DDosData('ui',
+                                                      t[1].encode('utf-8')),
+                                             signing_key)
             core.receive_queue.put(('new_transaction',
                                     transaction,
                                     'local'
@@ -247,6 +251,9 @@ def main(argv):
             core.receive_queue.put(('show_children',
                                     str(verify_key_hex),
                                     'local'))
+
+        elif re.fullmatch(r'public', command):
+            print(str(verify_key_hex))
 
 
 if __name__ == "__main__":

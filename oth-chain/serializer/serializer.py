@@ -64,6 +64,9 @@ def create_dict(obj: Any) -> dict:
     Returns:
         Dict containing the data of the object.
     """
+
+    # Chains
+
     if isinstance(obj, chains.Block):
         h_dict = create_dict(obj.header)
         transactions = create_dict(obj.transactions)
@@ -72,8 +75,13 @@ def create_dict(obj: Any) -> dict:
     elif isinstance(obj, (chains.Transaction,
                           chains.Header,
                           chains.DNS_Transaction,
-                          chains.DNS_Data)):
+                          chains.DNS_Data,
+                          chains.DDosHeader,
+                          chains.DDosTransaction,
+                          chains.DDosData)):
         data = create_dict_named(obj)
+
+    # General
 
     elif isinstance(obj, tuple):
         data = dict(
@@ -148,6 +156,8 @@ def create_object(data: dict):
     if isinstance(data, list):
         return [create_object(e) for e in data]
 
+    # Chains
+
     if data['__type__'] == 'Transaction':
         return chains.Transaction(**create_object(data['__data__']))
 
@@ -157,6 +167,23 @@ def create_object(data: dict):
     if data['__type__'] == 'Block':
         return chains.Block(create_object(data['__header__']),
                             create_object(data['__transactions__']))
+
+    if data['__type__'] == 'DNS_Transaction':
+        return chains.DNS_Transaction(**create_object(data['__data__']))
+
+    if data['__type__'] == 'DNS_Data':
+        return chains.DNS_Data(**create_object(data['__data__']))
+
+    if data['__type__'] == 'DDosHeader':
+        return chains.DDosHeader(**create_object(data['__data__']))
+
+    if data['__type__'] == 'DDosTransaction':
+        return chains.DDosTransaction(**create_object(data['__data__']))
+
+    if data['__type__'] == 'DDosData':
+        return chains.DDosData(**create_object(data['__data__']))
+
+    # General
 
     if data['__type__'] == 'Tuple':
         return tuple(
