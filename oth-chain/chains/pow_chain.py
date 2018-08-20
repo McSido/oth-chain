@@ -111,24 +111,27 @@ class PoW_Blockchain(Blockchain):
 
             if validate_hash == transaction_hash:
                 print_debug_info('Signature OK')
-                balance = self.check_balance(
-                    transaction.sender, transaction.timestamp)
-                if balance >= transaction.amount + transaction.fee:
-                    print_debug_info(
-                        'Balance sufficient, transaction is valid')
-                    return True
-                print_debug_info(
-                    'Balance insufficient, transaction is invalid')
-                print_debug_info(
-                    f'Transaction at fault: {transaction} ' +
-                    f'was not covered by balance: {balance}')
-                return False
+                return self.validate_balance(transaction)
             print_debug_info('Wrong Hash')
             return False
 
         except BadSignatureError:
             print_debug_info('Bad Signature, Validation Failed')
             return False
+
+    def validate_balance(self, transaction: Transaction):
+        balance = self.check_balance(
+            transaction.sender, transaction.timestamp)
+        if balance >= transaction.amount + transaction.fee:
+            print_debug_info(
+                'Balance sufficient, transaction is valid')
+            return True
+        print_debug_info(
+            'Balance insufficient, transaction is invalid')
+        print_debug_info(
+            f'Transaction at fault: {transaction} ' +
+            f'was not covered by balance: {balance}')
+        return False
 
     def create_proof(self, miner_key: bytes) -> int:
         """ Create proof of work.
