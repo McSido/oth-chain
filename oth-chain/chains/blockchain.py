@@ -443,7 +443,6 @@ class Blockchain(object):
         t_hash: List[Any] = []
 
         while len(hash_list) != 1:
-            print(hash_list)
             t_hash.clear()
             for i in range(0, len(hash_list), 2):
                 t_hash.append(Blockchain.hash(

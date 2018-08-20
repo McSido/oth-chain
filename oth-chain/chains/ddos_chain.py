@@ -2,7 +2,7 @@ from nacl.exceptions import BadSignatureError
 
 from .blockchain import Blockchain, Block, Address
 from utils import Node, print_debug_info
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from typing import Any, List, Tuple, Callable, Dict
 from queue import Queue
 from pprint import pprint
@@ -150,7 +150,7 @@ class DDosChain(Blockchain):
         self.transaction_pool.append(transaction)
         self.send_queue.put(('new_transaction', transaction, 'broadcast'))
         if len(self.transaction_pool) >= 5:
-            self.new_block(self.create_block(self.create_proof(b'0')))
+            self.create_m_blocks()
 
     def process_block(self, block: Block):
         for transaction in block.transactions:
@@ -169,6 +169,56 @@ class DDosChain(Blockchain):
             self.send_queue.put(('new_block', block, 'broadcast'))
         else:
             print_debug_info('Block not for main chain')
+
+        if block.header in self.new_chain:
+            if block.header.root_hash ==\
+                    self.create_merkle_root(block.transactions):
+                # Validate transactions<->header
+                self.new_chain[block.header] = block.transactions
+
+                for t in block.transactions:
+                    try:
+                        # Remove processed transactions
+                        self.intermediate_transactions.remove(t)
+                    except ValueError:
+                        pass
+
+            # Check if new chain is finished
+            if not any(t is None for t in self.new_chain.values()):
+                # Validate transactions
+                old_data = next(iter(self.new_chain.items()))
+                for h, t in self.new_chain.items():
+                    if h == old_data[0]:
+                        continue
+                    if self.validate_block(
+                            Block(h, t), Block(old_data[0], old_data[1])):
+                        old_data = (h, t)
+                    else:
+                        print_debug_info(
+                            'Invalid transaction in new chain')
+                        self.new_chain.clear()
+                        self.intermediate_transactions.clear()
+
+                # Exchange data
+                self.chain = OrderedDict(self.new_chain)
+                self.new_chain.clear()
+                self.blocked_ips.clear()
+                for initial_node in self.tree.get_children():
+                    for c in initial_node.get_children():
+                        self.tree.remove_node(c, True)
+                self.transaction_pool = list(self.intermediate_transactions)
+                self.intermediate_transactions.clear()
+                # Process new data
+                for h, t in self.chain.items():
+                    self.process_block(Block(h, t))
+                # Broadcast changes
+                self.send_queue.put(
+                    ('new_header', self.latest_header(), 'broadcast'))
+                # Create new blocks
+                self.create_m_blocks()
+
+        else:
+            print_debug_info('Block not for new chain')
 
     def validate_block(self, block: Block, last_block: Block) -> bool:
         if not super().validate_block(block, last_block):
@@ -203,6 +253,22 @@ class DDosChain(Blockchain):
             print_debug_info('Bad Signature, Validation Failed')
             return False
 
+    def create_m_blocks(self):
+        t_amount = len(self.transaction_pool)
+        for i in range(0, t_amount, 5):
+            if i+5 > t_amount:
+                break
+            header = DDosHeader(self.version,
+                                len(self.chain),
+                                time(),
+                                self.latest_block().header.root_hash,
+                                self.create_merkle_root(
+                                    self.transaction_pool[i:i+5]
+                                ))
+            block = Block(header,
+                          list(self.transaction_pool[i:i+5]))
+            self.new_block(block)
+
     def create_block(self, proof: Any) -> Block:
         header = DDosHeader(self.version,
                             len(self.chain),
@@ -220,7 +286,54 @@ class DDosChain(Blockchain):
         return 0
 
     def resolve_conflict(self, new_chain: List[DDosHeader]):
-        pass
+        print_debug_info('Resolving conflict')
+        if len(self.chain) < len(new_chain):
+            if len(self.new_chain) < len(new_chain):
+                # Validate new_chain
+                old_header = new_chain[0]
+                for header in new_chain[1:]:
+                    if self.validate_header(header, old_header):
+                        old_header = header
+                    else:
+                        print_debug_info('Conflict resolved (old chain)')
+                        return
+
+                # Clear intermediate transactions
+                self.intermediate_transactions.clear()
+
+                # Create blockchain from new_chain
+                new_bchain: OrderedDict[DDosHeader, List[DDosTransaction]] = \
+                    OrderedDict([(h, None) for h in new_chain])
+
+                # Add known blocks
+                for h, t in self.chain.items():
+                    if h in new_bchain:
+                        new_bchain[h] = t
+                    else:
+                        # Update intermediate transactions
+                        self.intermediate_transactions += t
+
+                for h, t in self.new_chain.items():
+                    if h in new_bchain:
+                        new_bchain[h] = t
+                        if t:
+                            for i_t in t:
+                                try:
+                                    # Remove processed transactions
+                                    self.intermediate_transactions.remove(i_t)
+                                except ValueError:
+                                    pass
+
+                self.new_chain = new_bchain
+                print_debug_info('Conflict (Header) resolved (new chain)')
+
+                # Ask for missing blocks
+                for h, t in self.new_chain.items():
+                    if t is None:
+                        self.send_queue.put(('get_block', h, 'broadcast'))
+
+        else:
+            print_debug_info('Conflict resolved (old chain)')
 
     def process_message(self) -> Callable[[str, Any, Address], Any]:
         """ Create processor for incoming blockchain messages.
