@@ -36,17 +36,17 @@ This Blockchain is built to show the basic principles of a public Blockchain. It
 ### Commands
 
 **help**: prints commands\
-**transaction \<to> \<amount>** : Create transaction \
-**mine**: mine a new block \
-**balance [\<name>]**: Print balance (name optional) \
-**dump**: print blockchain \
-**peers**: print peers \
-**key \<filename>** : Save current key to \<filename>\
-**import \<key> \<name**> : Imports a public key associated with \<name> from file \<file> to the keystore\
-**deletekey \<name>** : Deletes key associated with \<name> from keystore\
-**export \<filename>** : Exports one own public key to file \<filename>\
-**gui**: Open GUI\
-**save**: Save blockchain to bc_file.txt\
+**transaction \<to> \<amount>** : Create transaction  
+**mine**: mine a new block  
+**balance [\<name>]**: Print balance (name optional)  
+**dump**: print blockchain  
+**peers**: print peers  
+**key \<filename>** : Save current key to \<filename>  
+**import \<key> \<name>** : Imports a public key associated with \<name> from file \<file> to the keystore  
+**deletekey \<name>** : Deletes key associated with \<name> from keystore  
+**export \<filename>** : Exports one own public key to file \<filename>  
+**gui**: Open GUI  
+**save**: Save blockchain to bc_file.txt  
 **exit**: exits program
 
 ### Options
@@ -66,7 +66,7 @@ The DNS blockchain is split into the basic node functionality and a DNS-Server.
 ### Description - Node
 
 This blockchain allows for storage/transfer/auction of DNS records.  
-It is built on top of the [Proof-Of-Work Blockchain](#Proof-of-Work-Blockchain) and therefore allows for the same functionality with dns added on top.  
+It is built on top of the [Proof-of-Work Blockchain](#Proof-of-Work-Blockchain) and therefore allows for the same functionality with dns added on top.  
 The auction mechanism works as follows:
 
 1. User opens auction for domain
@@ -79,14 +79,14 @@ The auction mechanism works as follows:
 
 ### Commands - Node
 
-Additionally to the [commands](#Commands) of the [Proof-Of-Work Blockchain](#Proof-of-Work-Blockchain):
+Additionally to the [commands](#Commands) of the [Proof-of-Work Blockchain](#Proof-of-Work-Blockchain):
 
-**register \<domain> \<ip>**: Registers an available domain to an IP (costs 20 coins)
-**update \<domain> \<ip>** : Updates an existing already owned domain with a new IP (costs 20 coins)
-**transfer \<to> \<domain>** : Transfers an owned domain to another user (costs 1 coin)
-**auction \<domain>** : Offers an owned domain for auction (costs 1 coin)
-**bid \<amount> \<domain>** : Places a bid of <\amount> on the auctioned domain.
-**resolve \<domain>** : Resolves the domain name and prints the IP (if the domain does not exist, prints '')
+**register \<domain> \<ip>**: Registers an available domain to an IP (costs 20 coins)  
+**update \<domain> \<ip>** : Updates an existing already owned domain with a new IP (costs 20 coins)  
+**transfer \<to> \<domain>** : Transfers an owned domain to another user (costs 1 coin)  
+**auction \<domain>** : Offers an owned domain for auction (costs 1 coin)  
+**bid \<amount> \<domain>** : Places a bid of <\amount> on the auctioned domain.  
+**resolve \<domain>** : Resolves the domain name and prints the IP (if the domain does not exist, prints '')  
 
 ### Description - Server
 
@@ -141,21 +141,21 @@ If one of them tries to harm the system, A can step in and remove their access a
 
 ### Commands - DDoS
 
-**help**: prints commands
-**dump**: print blockchain
-**peers**: print peers
-**exit**: exits program
-**key \<filename>** : Save current key to \<filename>
-**export \<filename>** : Exports one own public key to file \<filename>
-**blocked:** print blocked IPs
-**invite \<pub-key>** : Invite owner of \<pub-key> into the chain
-**uninvite \<pub-key>** : Remove owner of \<pub-key> from the chain
-**block \<ip>** : Add IP to the list of blocked IPs
-**unblock \<ip>** : Remove IP from the list of blocked IPs
-**purge \<pub-key>**: Remove owner of the \<pub-key> and unblock all of their blocked IPs
-**children**: print all descendants
-**public**: print public key
-**exit**: exits program
+**help**: prints commands  
+**dump**: print blockchain  
+**peers**: print peers  
+**exit**: exits program  
+**key \<filename>** : Save current key to \<filename>  
+**export \<filename>** : Exports one own public key to file \<filename>  
+**blocked:** print blocked IPs  
+**invite \<pub-key>** : Invite owner of \<pub-key> into the chain  
+**uninvite \<pub-key>** : Remove owner of \<pub-key> from the chain  
+**block \<ip>** : Add IP to the list of blocked IPs  
+**unblock \<ip>** : Remove IP from the list of blocked IPs  
+**purge \<pub-key>**: Remove owner of the \<pub-key> and unblock all of their blocked IPs  
+**children**: print all descendants  
+**public**: print public key  
+**exit**: exits program  
 
 ### Options - DDoS
 
@@ -165,9 +165,33 @@ If one of them tries to harm the system, A can step in and remove their access a
 -k --key=<PATH>    Load private key from file
 ```
 
-## Information
+## Structure
 
-### Components
+### [chains](./oth-chain/chains)
+
+This modules contains all different blockchain implementations.
+
+### [gui](./oth-chain/gui)
+
+This module contains the GUI for the blockchains.
+
+### [networking](./oth-chain/networking)
+
+This module contains everything needed for the P2P communication for the blockchains.
+
+### [serializer](./oth-chain/serializer)
+
+This module is used to (de)serialize the data used in the blockchains.
+
+### [utils](./oth-chain/utils)
+
+This module contains the utility functionality used in the blockchains:
+
+* **keystore**: Store for public keys of other accounts for easier use
+* **node**: Tree structure used for the access hierarchy of the DDoS-chain
+* **utils**: Additional utility functions (e.g. print_debug)
+
+---
 
 #### [blockchain.py](./blockchain.py)
 
@@ -190,18 +214,20 @@ Start of the blockchain \
 Responsible for the setup of the blockchain and networking system \
 CLI loop
 
-### Internal communication
+---
+
+## Internal communication
 
 Internal communication (between threads) of the blockchain is handled via two Queues \
 <img src="./documentation/Blockchain_internal.svg">
 
-### Networking protocol
+## Networking protocol
 
 Messages are serialized as JSON \
 Messages contain a message-type and message-data \
 [Further information](./documentation/protocol.md)
 
-### Tests
+## [Tests](./oth-chain/tests)
 
 For testing run pytest -v\
 OUTDATED: Additional stress-tests are in [stress-test.py](./stress-test.py)
