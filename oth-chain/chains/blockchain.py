@@ -8,7 +8,7 @@ from pathlib import Path
 from pprint import pprint
 from queue import Queue
 from time import time
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Tuple
 
 from utils import print_debug_info
 from networking import Address
@@ -332,10 +332,44 @@ class Blockchain(object):
         """
         raise NotImplementedError
 
-    def process_message(self) -> Callable:
-        """ Currently does nothing
+    def process_message(self, message: Tuple[str, Any, Address]):
+        """ Create processor for incoming blockchain messages.
+
+        Returns:
+            Processor (function) that processes blockchain messages.
         """
-        raise NotImplementedError
+
+        msg_type, msg_data, msg_address = message
+        if msg_type == 'new_block':
+            assert isinstance(msg_data, Block)
+            self.new_block(msg_data)
+        elif msg_type == 'new_transaction':
+            assert isinstance(msg_data, Transaction)
+            if msg_data.sender != '0':
+                self.new_transaction(msg_data)
+        elif msg_type == 'resolve_conflict':
+            assert isinstance(msg_data, list)
+            assert all(isinstance(header, Header) for header in msg_data)
+            self.resolve_conflict(msg_data)
+        elif msg_type == 'save':
+            if msg_address != 'local':
+                return
+            self.save_chain()
+        elif msg_type == 'dump':
+            if msg_address == 'gui':
+                self.gui_queue.put(
+                    ('dump', (self.chain, self.transaction_pool), 'local'))
+                self.gui_ready = True
+                return
+            if msg_address != 'local':
+                return
+            pprint(vars(self))
+        elif msg_type == 'get_block':
+            assert isinstance(msg_data, Header)
+            self.send_block(msg_data, msg_address)
+        elif msg_type == 'new_header':
+            assert isinstance(msg_data, Header)
+            self.new_header(msg_data)
 
     def latest_block(self) -> Block:
         """ Get the latest block.
@@ -468,3 +502,10 @@ class Blockchain(object):
             A hash of the data.
         """
         return hashlib.sha256(str(data).encode()).hexdigest()
+
+    def get_message_processor(self):
+        """ Returns a message processor callable"""
+        def processor(message: Tuple[str, Any, Address]):
+            self.process_message(message)
+
+        return processor

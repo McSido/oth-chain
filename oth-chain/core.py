@@ -62,7 +62,7 @@ def receive_msg(msg_type: str, msg_data: Any, msg_address: Address,
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
     else:
-        processor(msg_type, msg_data, msg_address)
+        processor((msg_type, msg_data, msg_address))
 
 
 def blockchain_loop(blockchain: Blockchain, processor):
@@ -193,7 +193,7 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
         my_blockchain = DNSBlockChain(VERSION, send_queue, gui_send_queue)
     else:
         my_blockchain = PoW_Blockchain(VERSION, send_queue, gui_send_queue)
-    my_blockchain_processor = my_blockchain.process_message()
+    my_blockchain_processor = my_blockchain.get_message_processor()
 
     # Create networking thread
     networker = threading.Thread(

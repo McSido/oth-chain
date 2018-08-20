@@ -5,7 +5,7 @@ import hashlib
 import math
 import time
 from pprint import pprint
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 
 import nacl.encoding
 import nacl.signing
@@ -251,56 +251,11 @@ class PoW_Blockchain(Blockchain):
             difficulty = 1
         return difficulty
 
-    def process_message(self) -> Callable[[str, Any, Address], Any]:
-        """ Create processor for incoming blockchain messages.
-
-        Returns:
-            Processor (function) that processes blockchain messages.
+    def process_message(self, message: Tuple[str, Any, Address]):
+        """ Receives a message and interprets it
         """
-
-        def new_block_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, Block)
-            self.new_block(msg_data)
-
-        def new_transaction_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, Transaction)
-            if msg_data.sender != '0':
-                self.new_transaction(msg_data)
-
-        def mine(msg_data: Any, msg_address: Address):
-            if msg_address != 'local':
-                return
-            proof = self.create_proof(msg_data)
-            block = self.create_block(proof)
-            fee_sum = 0
-            for transaction in block.transactions:
-                fee_sum += transaction.fee
-            reward_multiplier = math.floor(block.header.index / 10) - 1
-            mining_reward = 50 >> 2**reward_multiplier\
-                if reward_multiplier >= 0 else 50
-            block.transactions.append(
-                Transaction(sender='0', recipient=msg_data,
-                            amount=mining_reward + fee_sum, fee=0,
-                            timestamp=time.time(), signature='0'))
-
-            root_hash = self.create_merkle_root(block.transactions)
-            real_header = Header(
-                block.header.version,
-                block.header.index,
-                block.header.timestamp,
-                block.header.previous_hash,
-                root_hash,
-                block.header.proof
-            )
-            real_block = Block(real_header, block.transactions)
-            self.new_block(real_block)
-
-        def resolve_conflict_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, list)
-            assert all(isinstance(header, Header) for header in msg_data)
-            self.resolve_conflict(msg_data)
-
-        def print_balance(msg_data: Any, msg_address: Address):
+        msg_type, msg_data, msg_address = message
+        if msg_type == 'print_balance':
             balance = self.check_balance(msg_data[0], msg_data[1])
             if msg_address == 'gui':
                 self.gui_queue.put(('balance', balance, 'local'))
@@ -308,47 +263,10 @@ class PoW_Blockchain(Blockchain):
                 print(
                     'Current Balance: ' +
                     f'{balance}')
-
-        def save_chain(_: Any, msg_address: Address):
-            if msg_address != 'local':
-                return
-            self.save_chain()
-
-        def dump_vars(_: Any, msg_address: Address):
-            if msg_address == 'gui':
-                self.gui_queue.put(
-                    ('dump', (self.chain, self.transaction_pool), 'local'))
-                self.gui_ready = True
-                return
-            if msg_address != 'local':
-                return
-            pprint(vars(self))
-
-        def get_block_inner(msg_data: Any, msg_address: Address):
-            assert isinstance(msg_data, Header)
-            self.send_block(msg_data, msg_address)
-
-        def new_header_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, Header)
-            self.new_header(msg_data)
-
-        commands: Dict[str, Callable[[Any, Address], Any]] = {
-            'new_block': new_block_inner,
-            'new_transaction': new_transaction_inner,
-            'mine': mine,
-            'resolve_conflict': resolve_conflict_inner,
-            'print_balance': print_balance,
-            'save': save_chain,
-            'dump': dump_vars,
-            'get_block': get_block_inner,
-            'new_header': new_header_inner
-        }
-
-        def processor(msg_type: str, msg_data: Any,
-                      msg_address: Address) -> Any:
-            commands[msg_type](msg_data, msg_address)
-
-        return processor
+        elif msg_type == 'mine':
+            self.mine(msg_data, msg_address)
+        else:
+            super(PoW_Blockchain, self).process_message(message)
 
     @property
     def difficulty(self) -> int:
@@ -358,3 +276,36 @@ class PoW_Blockchain(Blockchain):
             Difficulty of the current block.
         """
         return self.scale_difficulty(self.latest_block())
+
+    def mine(self, msg_data: Any, msg_address: Address):
+        """ Mines a new block.
+            Args:
+                msg_data: The key of the miner
+                msg_address: -
+        """
+        if msg_address != 'local':
+            return
+        proof = self.create_proof(msg_data)
+        block = self.create_block(proof)
+        fee_sum = 0
+        for transaction in block.transactions:
+            fee_sum += transaction.fee
+        reward_multiplier = math.floor(block.header.index / 10) - 1
+        mining_reward = 50 >> 2 ** reward_multiplier \
+            if reward_multiplier >= 0 else 50
+        block.transactions.append(
+            Transaction(sender='0', recipient=msg_data,
+                        amount=mining_reward + fee_sum, fee=0,
+                        timestamp=time.time(), signature='0'))
+
+        root_hash = self.create_merkle_root(block.transactions)
+        real_header = Header(
+            block.header.version,
+            block.header.index,
+            block.header.timestamp,
+            block.header.previous_hash,
+            root_hash,
+            block.header.proof
+        )
+        real_block = Block(real_header, block.transactions)
+        self.new_block(real_block)
