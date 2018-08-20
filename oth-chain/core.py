@@ -230,7 +230,8 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
 
 
 def get_command():
-    """ Gets a command from the cli and normalizes it"""
+    """ Gets a command from the cli and normalizes it
+    """
     try:
         command = input()
     except KeyboardInterrupt:
@@ -240,6 +241,16 @@ def get_command():
     command = command.lower().strip()
     command = re.sub(r'\s\s*', ' ', command)
     return command
+
+
+def validate_ip(ip: str):
+    """ Takes an ip_address string and validates it
+    """
+    try:
+        socket.inet_aton(ip)
+        return True
+    except OSError:
+        return False
 
 
 def main(argv):
@@ -398,12 +409,7 @@ keystore
                 print('Command not supported!')
                 continue
             t = command.split(' ')
-            valid_ip = True
-            try:
-                socket.inet_aton(t[2])
-            except OSError:
-                valid_ip = False
-            if not valid_ip:
+            if not validate_ip(t[2]):
                 print('Not a valid ip')
                 continue
             recipient = '0'

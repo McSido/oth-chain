@@ -201,12 +201,7 @@ def main(argv):
         elif re.fullmatch(r'block \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
                           command):
             t = command.split(' ')
-            valid_ip = True
-            try:
-                socket.inet_aton(t[1])
-            except OSError:
-                valid_ip = False
-            if not valid_ip:
+            if not core.validate_ip(t[1]):
                 print('Not a valid ip')
                 continue
             timestamp = time.time()
@@ -220,12 +215,7 @@ def main(argv):
         elif re.fullmatch(r'unblock \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
                           command):
             t = command.split(' ')
-            valid_ip = True
-            try:
-                socket.inet_aton(t[1])
-            except OSError:
-                valid_ip = False
-            if not valid_ip:
+            if not core.validate_ip(t[1]):
                 print('Not a valid ip')
                 continue
             timestamp = time.time()
