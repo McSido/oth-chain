@@ -365,10 +365,10 @@ class Blockchain(object):
                 return
             pprint(vars(self))
         elif msg_type == 'get_block':
-            assert isinstance(msg_data, Header)
+            # assert isinstance(msg_data, Header)
             self.send_block(msg_data, msg_address)
         elif msg_type == 'new_header':
-            assert isinstance(msg_data, Header)
+            # assert isinstance(msg_data, Header)
             self.new_header(msg_data)
 
     def latest_block(self) -> Block:
