@@ -144,7 +144,21 @@ def main(argv):
         if command == 'help':
             help_str = (""" Available commands:
                 help: prints commands
-                ##STUFF##
+                dump: print blockchain
+                peers: print peers
+                exit: exits program
+                key <filename> : Save current key to <filename>
+                export <filename> : Exports one own public key to file\
+<filename>
+                blocked: print blocked IPs
+                invite <pub-key> : Invite owner of <pub-key> into the chain
+                uninvite <pub-key> : Remove owner of <pub-key> from the chain
+                block <ip> : Add IP to the list of blocked IPs
+                unblock <ip> : Remove IP from the list of blocked IPs
+                purge <pub-key> : Remove owner of the <pub-key> and unblock all
+of their blocked IPs
+                children: print all descendants
+                public: print public key
                 exit: exits program
                 """)
             print(help_str)
