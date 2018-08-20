@@ -1,15 +1,18 @@
+import os
+from collections import namedtuple, OrderedDict
+from pathlib import Path
+from pprint import pprint
+from queue import Queue
+from time import time
+from typing import Any, List, Callable, Dict
+
+import nacl.encoding
+import nacl.signing
+import serializer
 from nacl.exceptions import BadSignatureError
+from utils import Node, print_debug_info
 
 from .blockchain import Blockchain, Block, Address
-from utils import Node, print_debug_info
-from collections import namedtuple, OrderedDict
-from typing import Any, List, Tuple, Callable, Dict
-from queue import Queue
-from pprint import pprint
-from time import time
-
-import nacl.signing
-import nacl.encoding
 
 DDosHeader = namedtuple('DDosHeader',
                         ['version',
@@ -51,9 +54,22 @@ class DDosChain(Blockchain):
             f.writelines(self.blocked_ips.keys())
 
     def load_chain(self):
-        # TODO: load from file
+        if os.path.exists('ddos_bc_file.txt') and \
+                os.stat('ddos_bc_file.txt').st_size != 0 and \
+                Path('ddos_bc_file.txt').is_file():
+            print_debug_info(
+                'Load existing blockchain from file')
+            with open('ddos_bc_file.txt', 'r') as bc_file:
+                self.chain = serializer.deserialize(bc_file.read())
+        else:
+            self.chain[DDosHeader(0, 0, 768894480, 0, 0)] = []
 
-        self.chain[DDosHeader(0, 0, 768894480, 0, 0)] = []
+    def save_chain(self):
+        """ Save the current chain to the hard drive.
+        """
+        pprint('saving to file named bc_file.txt')
+        with open('ddos_bc_file.txt', 'w') as output:
+            output.write(serializer.serialize(self.chain))
 
     def process_transaction(self, transaction: DDosTransaction):
         # INVITE
@@ -138,9 +154,8 @@ class DDosChain(Blockchain):
                 if str(transaction.sender) in [a.content for a in ancestors]:
                     # IP blocked from descendant
                     return True
-                else:
-                    print_debug_info('IP was already blocked')
-                    return False
+                print_debug_info('IP was already blocked')
+                return False
             else:
                 print_debug_info('Trying to unblock IP that was not blocked')
                 return False

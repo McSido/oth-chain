@@ -128,8 +128,12 @@ class Blockchain(object):
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
             if self.gui_ready:
                 self.gui_queue.put(('new_transaction', transaction, 'local'))
+            self.check_auction(transaction)
         else:
             print_debug_info('Invalid transaction')
+
+    def check_auction(self, transaction: Transaction):
+        pass
 
     def new_block(self, block: Block):
         """ Adds a provided block to the chain after checking it for validity.

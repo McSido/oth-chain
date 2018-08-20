@@ -56,37 +56,11 @@ class DNSBlockChain(PoW_Blockchain):
         self.load_chain()  # overwrite?
         self.auctions: OrderedDict[int, List[Tuple[DNS_Transaction, DNS_Transaction]]] = OrderedDict()
 
-    def new_transaction(self, transaction: Transaction):
-        """ Add a new transaction to the blockchain.
-            Overwrites new_transaction from blockchain.py
-            If the receiver is '0', and the domain operation is 'transfer',
-            an auction for that domain is started.
-            If the receiver is '0', and the domain opeartion is 'b',
-            a bid for that domain is issued.
-
-        Args:
-            transaction: Transaction that should be added.
-        """
-        # Make sure, only one mining reward is granted per block
-        for pool_transaction in self.transaction_pool:
-            if pool_transaction.sender == '0' and \
-                    pool_transaction.signature == '0':
-                print_debug_info(
-                    'This block already granted a mining transaction!')
-                return
-        if transaction in self.latest_block().transactions:
-            return
-        if self.validate_transaction(transaction):
-            self.transaction_pool.append(transaction)
-            self.send_queue.put(('new_transaction', transaction, 'broadcast'))
-            if self.gui_ready:
-                self.gui_queue.put(('new_transaction', transaction, 'local'))
-            if transaction.recipient == '0' and transaction.data.type == 't':
-                self._auction(transaction)
-            if transaction.recipient == '0' and transaction.data.type == 'b':
-                self._bid(transaction)
-        else:
-            print_debug_info('Invalid transaction')
+    def check_auction(self, transaction: DNS_Transaction):
+        if transaction.recipient == '0' and transaction.data.type == 't':
+            self._auction(transaction)
+        if transaction.recipient == '0' and transaction.data.type == 'b':
+            self._bid(transaction)
 
     def validate_transaction(self, transaction: DNS_Transaction, mining: bool = False) -> bool:
         """ Validates a given transaction.

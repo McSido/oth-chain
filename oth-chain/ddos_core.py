@@ -98,7 +98,7 @@ def init(port: int, signing_key):
 def create_transaction(sender: str,
                        timestamp: int,
                        data: DDosData,
-                       signing_key: nacl.signing.SigningKey)\
+                       signing_key: nacl.signing.SigningKey) \
         -> DDosTransaction:
     hash_str = (str(sender) +
                 str(data) +
@@ -131,15 +131,7 @@ def main(argv):
     while True:
 
         print('Action: ')
-
-        try:
-            command = input()
-        except KeyboardInterrupt:
-            print('Detected Keyboard interrupt, exiting program')
-            command = 'exit'
-
-        command = command.lower().strip()
-        command = re.sub(r'\s\s*', ' ', command)
+        command = core.get_command()
 
         if command == 'help':
             help_str = (""" Available commands:
@@ -254,6 +246,11 @@ def main(argv):
 
         elif re.fullmatch(r'public', command):
             print(str(verify_key_hex))
+        elif command == 'save':
+            core.receive_queue.put(('save',
+                                    '',
+                                    'local'
+                                    ))
 
 
 if __name__ == "__main__":

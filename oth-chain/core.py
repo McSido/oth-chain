@@ -229,6 +229,19 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
     return keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread, dns
 
 
+def get_command():
+    """ Gets a command from the cli and normalizes it"""
+    try:
+        command = input()
+    except KeyboardInterrupt:
+        print('Detected Keyboard interrupt, exiting program')
+        command = 'exit'
+
+    command = command.lower().strip()
+    command = re.sub(r'\s\s*', ' ', command)
+    return command
+
+
 def main(argv):
     """ Main function of the program.
 
@@ -241,26 +254,18 @@ def main(argv):
 
     # User Interaction
     while True:
-
+        command = None
         if gui_thread.is_alive():
             if not gui_receive_queue.empty():
                 command = gui_receive_queue.get(block=True)
                 print('Command from gui: {}'.format(command))
             else:
                 continue
-        else:
+
+        if not command:
             print('Action: ')
+            command = get_command()
 
-            try:
-                command = input()
-            except KeyboardInterrupt:
-                print('Detected Keyboard interrupt, exiting program')
-                command = 'exit'
-
-        command = command.lower().strip()
-        command = re.sub(r'\s\s*', ' ', command)
-
-        # gui_send_queue.put(command)
         if command == 'help':
             help_str = (""" Available commands:
                 help: prints commands
