@@ -56,25 +56,16 @@ class DDosChain(Blockchain):
         self.chain[DDosHeader(0, 0, 768894480, 0, 0)] = []
 
     def process_transaction(self, transaction: DDosTransaction):
-                # INVITE
+        # INVITE
         if transaction.data.type == 'i':
-            if str(transaction.data.data) in self.tree:
-                return
             new_node = Node(str(transaction.data.data))
             parent = self.tree.get_node_by_content(str(transaction.sender))
             parent.add_child(new_node)
 
         # UNINVITE
         elif transaction.data.type == 'ui':
-            if str(transaction.data.data) not in self.tree:
-                return
             node_to_remove = self.tree.get_node_by_content(
                 str(transaction.data.data))
-            sender_node = self.tree.get_node_by_content(
-                str(transaction.sender))
-            if node_to_remove.content not in sender_node:
-                print_debug_info('No permission to delete this node!')
-                return
             self.tree.remove_node(node_to_remove, False)
 
         # BLOCK IP
@@ -82,15 +73,12 @@ class DDosChain(Blockchain):
             if transaction.data.data in self.blocked_ips:
                 ancestors = self.blocked_ips[transaction.data.data].\
                     get_ancestors()
-                if (str(transaction.sender) in [a.content for a in ancestors]):
+                if str(transaction.sender) in [a.content for a in ancestors]:
                     # Escalate blocked-IP to ancestor
                     for a in ancestors:
                         if a.content == str(transaction.sender):
                             self.blocked_ips[transaction.data.data] = a
                             break
-                else:
-                    print_debug_info('IP was already blocked')
-                    return
             else:
                 self.blocked_ips[transaction.data.data] =\
                     self.tree.get_node_by_content(
@@ -98,36 +86,11 @@ class DDosChain(Blockchain):
 
         # UNBLOCK IP
         elif transaction.data.type == 'ub':
-            if transaction.data.data in self.blocked_ips:
-                if str(transaction.sender) ==\
-                        self.blocked_ips[transaction.data.data].content:
-                    del(self.blocked_ips[transaction.data.data])
-                    return
-
-                ancestors = self.blocked_ips[transaction.data.data].\
-                    get_ancestors()
-                if (str(transaction.sender) in [a.content for a in ancestors]):
-                    # IP blocked from descendant
-                    del(self.blocked_ips[transaction.data.data])
-                    return
-                else:
-                    print_debug_info('IP was already blocked')
-                    return
-
-            else:
-                print_debug_info('Trying to unblock IP that was not blocked')
-                return
+            del(self.blocked_ips[transaction.data.data])
         # PURGE
         elif transaction.data.type == 'p':
-            if str(transaction.data.data) not in self.tree:
-                return
             node_to_remove = self.tree.get_node_by_content(
                 str(transaction.data.data))
-            sender_node = self.tree.get_node_by_content(
-                str(transaction.sender))
-            if node_to_remove.content not in sender_node:
-                print_debug_info('No permission to delete this node!')
-                return
             self.tree.remove_node(node_to_remove, False)
             index_list = []
             # Remove all ips blocked from this client
@@ -138,14 +101,63 @@ class DDosChain(Blockchain):
             for index in index_list:
                 del(self.blocked_ips[index])
 
+    def valid_operation(self, transaction: DDosTransaction):
+        # Invite
+        if transaction.data.type == 'i':
+            if str(transaction.data.data) in self.tree:
+                print_debug_info('Client is already invited!')
+                return False
+        # Uninvite / Purge
+        elif transaction.data.type == 'ui' or transaction.data.type == 'p':
+            if str(transaction.data.data) not in self.tree:
+                print_debug_info('Client could not be found!')
+                return False
+            node_to_remove = self.tree.get_node_by_content(
+                str(transaction.data.data))
+            sender_node = self.tree.get_node_by_content(
+                str(transaction.sender))
+            if node_to_remove.content not in sender_node:
+                print_debug_info('No permission to delete this node!')
+                return False
+        # Block IP-Address
+        elif transaction.data.type == 'b':
+            if transaction.data.data in self.blocked_ips:
+                ancestors = self.blocked_ips[transaction.data.data].\
+                    get_ancestors()
+                if not str(transaction.sender) in [a.content for a in ancestors]:
+                    print_debug_info('IP was already blocked')
+                    return False
+        # Unblock IP-Address
+        elif transaction.data.type == 'ub':
+            if transaction.data.data in self.blocked_ips:
+                if str(transaction.sender) ==\
+                        self.blocked_ips[transaction.data.data].content:
+                    return True
+                ancestors = self.blocked_ips[transaction.data.data].\
+                    get_ancestors()
+                if str(transaction.sender) in [a.content for a in ancestors]:
+                    # IP blocked from descendant
+                    return True
+                else:
+                    print_debug_info('IP was already blocked')
+                    return False
+            else:
+                print_debug_info('Trying to unblock IP that was not blocked')
+                return False
+        return True
+
     def new_transaction(self, transaction: DDosTransaction):
         if not self.validate_transaction(transaction):
             print_debug_info('Invalid transaction')
             return
 
-        if transaction in self.transaction_pool:
-            print_debug_info('Transaction already in pool')
-            return
+        for pool_transaction in self.transaction_pool:
+            if transaction == pool_transaction:
+                print_debug_info('Transaction already in pool')
+                return
+            if transaction.data == pool_transaction.data:
+                print_debug_info('This operation is already in the pool')
+                return
 
         self.transaction_pool.append(transaction)
         self.send_queue.put(('new_transaction', transaction, 'broadcast'))
@@ -181,6 +193,9 @@ class DDosChain(Blockchain):
             print_debug_info('Sender could not be found in invited clients.')
             return False
 
+        if not self.valid_operation(transaction):
+            return False
+
         try:
             verify_key = nacl.signing.VerifyKey(
                 transaction.sender, encoder=nacl.encoding.HexEncoder)
@@ -190,8 +205,6 @@ class DDosChain(Blockchain):
                         str(transaction.data) +
                         str(transaction.timestamp))
             validate_hash = self.hash(hash_str)
-
-            # Validate right management
 
             if validate_hash == transaction_hash:
                 print_debug_info('Signature OK')
