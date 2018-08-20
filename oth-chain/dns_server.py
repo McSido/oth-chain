@@ -108,7 +108,7 @@ def parse_args(argv):
 def init(port):
     my_blockchain = DNSBlockChain(
         core.VERSION, core.send_queue, core.gui_send_queue)
-    my_blockchain_processor = my_blockchain.process_message()
+    my_blockchain_processor = my_blockchain.get_message_processor()
 
     # Create networking thread
     networker = threading.Thread(

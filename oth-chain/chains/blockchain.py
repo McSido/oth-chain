@@ -344,12 +344,12 @@ class Blockchain(object):
             assert isinstance(msg_data, Block)
             self.new_block(msg_data)
         elif msg_type == 'new_transaction':
-            assert isinstance(msg_data, Transaction)
+            # assert isinstance(msg_data, Transaction)
             if msg_data.sender != '0':
                 self.new_transaction(msg_data)
         elif msg_type == 'resolve_conflict':
             assert isinstance(msg_data, list)
-            assert all(isinstance(header, Header) for header in msg_data)
+            # assert all(isinstance(header, Header) for header in msg_data)
             self.resolve_conflict(msg_data)
         elif msg_type == 'save':
             if msg_address != 'local':

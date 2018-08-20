@@ -4,7 +4,7 @@ from pathlib import Path
 from pprint import pprint
 from queue import Queue
 from time import time
-from typing import Any, List, Callable, Dict
+from typing import Any, List, Callable, Dict, Tuple
 
 import nacl.encoding
 import nacl.signing
@@ -363,84 +363,25 @@ class DDosChain(Blockchain):
         else:
             print_debug_info('Conflict resolved (old chain)')
 
-    def process_message(self) -> Callable[[str, Any, Address], Any]:
+    def process_message(self, message: Tuple[str, Any, Address]):
         """ Create processor for incoming blockchain messages.
 
         Returns:
             Processor (function) that processes blockchain messages.
         """
-
-        # Blockchain
-
-        def new_block_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, Block)
-            self.new_block(msg_data)
-
-        def new_transaction_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, DDosTransaction)
-            if msg_data.sender != '0':
-                self.new_transaction(msg_data)
-
-        def resolve_conflict_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, list)
-            assert all(isinstance(header, DDosHeader) for header in msg_data)
-            self.resolve_conflict(msg_data)
-
-        def get_block_inner(msg_data: Any, msg_address: Address):
-            assert isinstance(msg_data, DDosHeader)
-            self.send_block(msg_data, msg_address)
-
-        def new_header_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, DDosHeader)
-            self.new_header(msg_data)
-
-        def save_chain(_: Any, msg_address: Address):
-            if msg_address != 'local':
-                return
-            self.save_chain()
-
-        # Utils
-
-        def dump_vars(_: Any, msg_address: Address):
-            if msg_address == 'gui':
-                self.gui_queue.put(
-                    ('dump', (self.chain, self.transaction_pool), 'local'))
-                self.gui_ready = True
-                return
-            if msg_address != 'local':
-                return
-            pprint(vars(self))
-
-        # DDOS
-
-        def get_ips_inner(msg_data: Any, msg_address: Address):
+        
+        msg_type, msg_data, msg_address = message
+        if msg_type == 'get_ips':
             if msg_address == 'local':
                 pprint(self.get_ips())
             elif msg_address == 'daemon':
                 self.save_ips_to_file()
             else:
                 return
-
-        def show_children(msg_data: Any, msg_address: Address):
+        elif msg_type == 'show_children':
             if not msg_address == 'local':
                 return
             node = self.tree.get_node_by_content(str(msg_data))
             node.print()
-
-        commands: Dict[str, Callable[[Any, Address], Any]] = {
-            'new_block': new_block_inner,
-            'new_transaction': new_transaction_inner,
-            'resolve_conflict': resolve_conflict_inner,
-            'save': save_chain,
-            'dump': dump_vars,
-            'get_block': get_block_inner,
-            'new_header': new_header_inner,
-            'get_ips': get_ips_inner,
-            'show_children': show_children
-        }
-
-        def processor(msg_type: str, msg_data: Any,
-                      msg_address: Address) -> Any:
-            commands[msg_type](msg_data, msg_address)
-
-        return processor
+        else:
+            super(DDosChain, self).process_message(message)

@@ -64,7 +64,7 @@ def init(port: int, signing_key):
     my_blockchain = DDosChain(core.VERSION,
                               core.send_queue,
                               core.gui_send_queue)
-    my_blockchain_processor = my_blockchain.process_message()
+    my_blockchain_processor = my_blockchain.get_message_processor()
 
     # Create networking thread
     networker = threading.Thread(
