@@ -197,55 +197,7 @@ class DDosChain(Blockchain):
         else:
             print_debug_info('Block not for main chain')
 
-        if block.header in self.new_chain:
-            if block.header.root_hash ==\
-                    self.create_merkle_root(block.transactions):
-                # Validate transactions<->header
-                self.new_chain[block.header] = block.transactions
-
-                for t in block.transactions:
-                    try:
-                        # Remove processed transactions
-                        self.intermediate_transactions.remove(t)
-                    except ValueError:
-                        pass
-
-            # Check if new chain is finished
-            if not any(t is None for t in self.new_chain.values()):
-                # Validate transactions
-                old_data = next(iter(self.new_chain.items()))
-                for h, t in self.new_chain.items():
-                    if h == old_data[0]:
-                        continue
-                    if self.validate_block(
-                            Block(h, t), Block(old_data[0], old_data[1])):
-                        old_data = (h, t)
-                    else:
-                        print_debug_info(
-                            'Invalid transaction in new chain')
-                        self.new_chain.clear()
-                        self.intermediate_transactions.clear()
-
-                # Exchange data
-                self.chain = OrderedDict(self.new_chain)
-                self.new_chain.clear()
-                self.blocked_ips.clear()
-                for initial_node in self.tree.get_children():
-                    for c in initial_node.get_children():
-                        self.tree.remove_node(c, True)
-                self.transaction_pool = list(self.intermediate_transactions)
-                self.intermediate_transactions.clear()
-                # Process new data
-                for h, t in self.chain.items():
-                    self.process_block(Block(h, t))
-                # Broadcast changes
-                self.send_queue.put(
-                    ('new_header', self.latest_header(), 'broadcast'))
-                # Create new blocks
-                self.create_m_blocks()
-
-        else:
-            print_debug_info('Block not for new chain')
+        self.check_new_chain(block)
 
     def validate_block(self, block: Block, last_block: Block) -> bool:
         if not super().validate_block(block, last_block):

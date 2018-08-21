@@ -157,6 +157,9 @@ class Blockchain(object):
             else:
                 print_debug_info('Block not for current chain')
 
+        self.check_new_chain(block)
+
+    def check_new_chain(self, block):
         if block.header in self.new_chain:
             if block.header.root_hash ==\
                     self.create_merkle_root(block.transactions):
