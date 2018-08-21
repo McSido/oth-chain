@@ -265,56 +265,6 @@ class DDosChain(Blockchain):
     def create_proof(self, miner_key: bytes) -> Any:
         return 0
 
-    def resolve_conflict(self, new_chain: List[DDosHeader]):
-        print_debug_info('Resolving conflict')
-        if len(self.chain) < len(new_chain):
-            if len(self.new_chain) < len(new_chain):
-                # Validate new_chain
-                old_header = new_chain[0]
-                for header in new_chain[1:]:
-                    if self.validate_header(header, old_header):
-                        old_header = header
-                    else:
-                        print_debug_info('Conflict resolved (old chain)')
-                        return
-
-                # Clear intermediate transactions
-                self.intermediate_transactions.clear()
-
-                # Create blockchain from new_chain
-                new_bchain: OrderedDict[DDosHeader, List[DDosTransaction]] = \
-                    OrderedDict([(h, None) for h in new_chain])
-
-                # Add known blocks
-                for h, t in self.chain.items():
-                    if h in new_bchain:
-                        new_bchain[h] = t
-                    else:
-                        # Update intermediate transactions
-                        self.intermediate_transactions += t
-
-                for h, t in self.new_chain.items():
-                    if h in new_bchain:
-                        new_bchain[h] = t
-                        if t:
-                            for i_t in t:
-                                try:
-                                    # Remove processed transactions
-                                    self.intermediate_transactions.remove(i_t)
-                                except ValueError:
-                                    pass
-
-                self.new_chain = new_bchain
-                print_debug_info('Conflict (Header) resolved (new chain)')
-
-                # Ask for missing blocks
-                for h, t in self.new_chain.items():
-                    if t is None:
-                        self.send_queue.put(('get_block', h, 'broadcast'))
-
-        else:
-            print_debug_info('Conflict resolved (old chain)')
-
     def process_message(self, message: Tuple[str, Any, Address]):
         """ Create processor for incoming blockchain messages.
 
