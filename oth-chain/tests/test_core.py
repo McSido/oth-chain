@@ -19,7 +19,7 @@ class TestCore(object):
         self.test_obj = TestPOW()
         self.test_obj.setup()
         self.chain = self.test_obj.blockchain
-        self.processor = self.chain.process_message()
+        self.processor = self.chain.get_message_processor()
         self.chain.send_queue = send_queue
         self.chain.gui_queue = gui_send_queue
         self.address = ('0.0.0.0', '2323')

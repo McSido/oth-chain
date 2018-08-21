@@ -8,7 +8,7 @@ from pathlib import Path
 from pprint import pprint
 from queue import Queue
 from time import time
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Tuple
 
 from utils import print_debug_info
 from networking import Address
@@ -128,8 +128,12 @@ class Blockchain(object):
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
             if self.gui_ready:
                 self.gui_queue.put(('new_transaction', transaction, 'local'))
+            self.check_auction(transaction)
         else:
             print_debug_info('Invalid transaction')
+
+    def check_auction(self, transaction: Transaction):
+        pass
 
     def new_block(self, block: Block):
         """ Adds a provided block to the chain after checking it for validity.
@@ -153,6 +157,9 @@ class Blockchain(object):
             else:
                 print_debug_info('Block not for current chain')
 
+        self.check_new_chain(block)
+
+    def check_new_chain(self, block):
         if block.header in self.new_chain:
             if block.header.root_hash ==\
                     self.create_merkle_root(block.transactions):
@@ -319,19 +326,101 @@ class Blockchain(object):
         raise NotImplementedError
 
     def resolve_conflict(self, new_chain: List[Header]):
-        """ Resolve conflict between to blockchains/forks.
+        """ Resolves any conflicts that occur with different/outdated chains.
 
-        Abstract function!
+        Conflicts are resolved by accepting the longest valid chain.
 
-        Arguments:
-            new_chain: Other blockchain to compare against the current.
+        Args:
+            new_chain: The chain to be validated,
+                received from other nodes in the network.
         """
-        raise NotImplementedError
+        print_debug_info('Resolving conflict')
+        if len(self.chain) < len(new_chain):
+            if len(self.new_chain) < len(new_chain):
+                # Validate new_chain
+                old_header = new_chain[0]
+                for header in new_chain[1:]:
+                    if self.validate_header(header, old_header):
+                        old_header = header
+                    else:
+                        print_debug_info('Conflict resolved (old chain)')
+                        return
 
-    def process_message(self) -> Callable:
-        """ Currently does nothing
+                # Clear intermediate transactions
+                self.intermediate_transactions.clear()
+
+                # Create blockchain from new_chain
+                new_bchain: OrderedDict[Header, List[Transaction]] = \
+                    OrderedDict([(h, None) for h in new_chain])
+
+                # Add known blocks
+                for h, t in self.chain.items():
+                    if h in new_bchain:
+                        new_bchain[h] = t
+                    else:
+                        # Update intermediate transactions
+                        self.intermediate_transactions += t
+
+                for h, t in self.new_chain.items():
+                    if h in new_bchain:
+                        new_bchain[h] = t
+                        if t:
+                            for i_t in t:
+                                try:
+                                    # Remove processed transactions
+                                    self.intermediate_transactions.remove(i_t)
+                                except ValueError:
+                                    pass
+
+                self.new_chain = new_bchain
+                print_debug_info('Conflict (Header) resolved (new chain)')
+
+                # Ask for missing blocks
+                for h, t in self.new_chain.items():
+                    if t is None:
+                        self.send_queue.put(('get_block', h, 'broadcast'))
+
+        else:
+            print_debug_info('Conflict resolved (old chain)')
+
+    def process_message(self, message: Tuple[str, Any, Address]):
+        """ Create processor for incoming blockchain messages.
+
+        Returns:
+            Processor (function) that processes blockchain messages.
         """
-        raise NotImplementedError
+
+        msg_type, msg_data, msg_address = message
+        if msg_type == 'new_block':
+            assert isinstance(msg_data, Block)
+            self.new_block(msg_data)
+        elif msg_type == 'new_transaction':
+            # assert isinstance(msg_data, Transaction)
+            if msg_data.sender != '0':
+                self.new_transaction(msg_data)
+        elif msg_type == 'resolve_conflict':
+            assert isinstance(msg_data, list)
+            # assert all(isinstance(header, Header) for header in msg_data)
+            self.resolve_conflict(msg_data)
+        elif msg_type == 'save':
+            if msg_address != 'local':
+                return
+            self.save_chain()
+        elif msg_type == 'dump':
+            if msg_address == 'gui':
+                self.gui_queue.put(
+                    ('dump', (self.chain, self.transaction_pool), 'local'))
+                self.gui_ready = True
+                return
+            if msg_address != 'local':
+                return
+            pprint(vars(self))
+        elif msg_type == 'get_block':
+            # assert isinstance(msg_data, Header)
+            self.send_block(msg_data, msg_address)
+        elif msg_type == 'new_header':
+            # assert isinstance(msg_data, Header)
+            self.new_header(msg_data)
 
     def latest_block(self) -> Block:
         """ Get the latest block.
@@ -464,3 +553,10 @@ class Blockchain(object):
             A hash of the data.
         """
         return hashlib.sha256(str(data).encode()).hexdigest()
+
+    def get_message_processor(self):
+        """ Returns a message processor callable"""
+        def processor(message: Tuple[str, Any, Address]):
+            self.process_message(message)
+
+        return processor

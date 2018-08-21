@@ -1,15 +1,18 @@
+import os
+from collections import namedtuple, OrderedDict
+from pathlib import Path
+from pprint import pprint
+from queue import Queue
+from time import time
+from typing import Any, List, Callable, Dict, Tuple
+
+import nacl.encoding
+import nacl.signing
+import serializer
 from nacl.exceptions import BadSignatureError
+from utils import Node, print_debug_info
 
 from .blockchain import Blockchain, Block, Address
-from utils import Node, print_debug_info
-from collections import namedtuple, OrderedDict
-from typing import Any, List, Tuple, Callable, Dict
-from queue import Queue
-from pprint import pprint
-from time import time
-
-import nacl.signing
-import nacl.encoding
 
 DDosHeader = namedtuple('DDosHeader',
                         ['version',
@@ -51,9 +54,22 @@ class DDosChain(Blockchain):
             f.writelines(self.blocked_ips.keys())
 
     def load_chain(self):
-        # TODO: load from file
+        if os.path.exists('ddos_bc_file.txt') and \
+                os.stat('ddos_bc_file.txt').st_size != 0 and \
+                Path('ddos_bc_file.txt').is_file():
+            print_debug_info(
+                'Load existing blockchain from file')
+            with open('ddos_bc_file.txt', 'r') as bc_file:
+                self.chain = serializer.deserialize(bc_file.read())
+        else:
+            self.chain[DDosHeader(0, 0, 768894480, 0, 0)] = []
 
-        self.chain[DDosHeader(0, 0, 768894480, 0, 0)] = []
+    def save_chain(self):
+        """ Save the current chain to the hard drive.
+        """
+        pprint('saving to file named bc_file.txt')
+        with open('ddos_bc_file.txt', 'w') as output:
+            output.write(serializer.serialize(self.chain))
 
     def process_transaction(self, transaction: DDosTransaction):
         # INVITE
@@ -138,9 +154,8 @@ class DDosChain(Blockchain):
                 if str(transaction.sender) in [a.content for a in ancestors]:
                     # IP blocked from descendant
                     return True
-                else:
-                    print_debug_info('IP was already blocked')
-                    return False
+                print_debug_info('IP was already blocked')
+                return False
             else:
                 print_debug_info('Trying to unblock IP that was not blocked')
                 return False
@@ -182,55 +197,7 @@ class DDosChain(Blockchain):
         else:
             print_debug_info('Block not for main chain')
 
-        if block.header in self.new_chain:
-            if block.header.root_hash ==\
-                    self.create_merkle_root(block.transactions):
-                # Validate transactions<->header
-                self.new_chain[block.header] = block.transactions
-
-                for t in block.transactions:
-                    try:
-                        # Remove processed transactions
-                        self.intermediate_transactions.remove(t)
-                    except ValueError:
-                        pass
-
-            # Check if new chain is finished
-            if not any(t is None for t in self.new_chain.values()):
-                # Validate transactions
-                old_data = next(iter(self.new_chain.items()))
-                for h, t in self.new_chain.items():
-                    if h == old_data[0]:
-                        continue
-                    if self.validate_block(
-                            Block(h, t), Block(old_data[0], old_data[1])):
-                        old_data = (h, t)
-                    else:
-                        print_debug_info(
-                            'Invalid transaction in new chain')
-                        self.new_chain.clear()
-                        self.intermediate_transactions.clear()
-
-                # Exchange data
-                self.chain = OrderedDict(self.new_chain)
-                self.new_chain.clear()
-                self.blocked_ips.clear()
-                for initial_node in self.tree.get_children():
-                    for c in initial_node.get_children():
-                        self.tree.remove_node(c, True)
-                self.transaction_pool = list(self.intermediate_transactions)
-                self.intermediate_transactions.clear()
-                # Process new data
-                for h, t in self.chain.items():
-                    self.process_block(Block(h, t))
-                # Broadcast changes
-                self.send_queue.put(
-                    ('new_header', self.latest_header(), 'broadcast'))
-                # Create new blocks
-                self.create_m_blocks()
-
-        else:
-            print_debug_info('Block not for new chain')
+        self.check_new_chain(block)
 
     def validate_block(self, block: Block, last_block: Block) -> bool:
         if not super().validate_block(block, last_block):
@@ -298,134 +265,25 @@ class DDosChain(Blockchain):
     def create_proof(self, miner_key: bytes) -> Any:
         return 0
 
-    def resolve_conflict(self, new_chain: List[DDosHeader]):
-        print_debug_info('Resolving conflict')
-        if len(self.chain) < len(new_chain):
-            if len(self.new_chain) < len(new_chain):
-                # Validate new_chain
-                old_header = new_chain[0]
-                for header in new_chain[1:]:
-                    if self.validate_header(header, old_header):
-                        old_header = header
-                    else:
-                        print_debug_info('Conflict resolved (old chain)')
-                        return
-
-                # Clear intermediate transactions
-                self.intermediate_transactions.clear()
-
-                # Create blockchain from new_chain
-                new_bchain: OrderedDict[DDosHeader, List[DDosTransaction]] = \
-                    OrderedDict([(h, None) for h in new_chain])
-
-                # Add known blocks
-                for h, t in self.chain.items():
-                    if h in new_bchain:
-                        new_bchain[h] = t
-                    else:
-                        # Update intermediate transactions
-                        self.intermediate_transactions += t
-
-                for h, t in self.new_chain.items():
-                    if h in new_bchain:
-                        new_bchain[h] = t
-                        if t:
-                            for i_t in t:
-                                try:
-                                    # Remove processed transactions
-                                    self.intermediate_transactions.remove(i_t)
-                                except ValueError:
-                                    pass
-
-                self.new_chain = new_bchain
-                print_debug_info('Conflict (Header) resolved (new chain)')
-
-                # Ask for missing blocks
-                for h, t in self.new_chain.items():
-                    if t is None:
-                        self.send_queue.put(('get_block', h, 'broadcast'))
-
-        else:
-            print_debug_info('Conflict resolved (old chain)')
-
-    def process_message(self) -> Callable[[str, Any, Address], Any]:
+    def process_message(self, message: Tuple[str, Any, Address]):
         """ Create processor for incoming blockchain messages.
 
         Returns:
             Processor (function) that processes blockchain messages.
         """
-
-        # Blockchain
-
-        def new_block_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, Block)
-            self.new_block(msg_data)
-
-        def new_transaction_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, DDosTransaction)
-            if msg_data.sender != '0':
-                self.new_transaction(msg_data)
-
-        def resolve_conflict_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, list)
-            assert all(isinstance(header, DDosHeader) for header in msg_data)
-            self.resolve_conflict(msg_data)
-
-        def get_block_inner(msg_data: Any, msg_address: Address):
-            assert isinstance(msg_data, DDosHeader)
-            self.send_block(msg_data, msg_address)
-
-        def new_header_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, DDosHeader)
-            self.new_header(msg_data)
-
-        def save_chain(_: Any, msg_address: Address):
-            if msg_address != 'local':
-                return
-            self.save_chain()
-
-        # Utils
-
-        def dump_vars(_: Any, msg_address: Address):
-            if msg_address == 'gui':
-                self.gui_queue.put(
-                    ('dump', (self.chain, self.transaction_pool), 'local'))
-                self.gui_ready = True
-                return
-            if msg_address != 'local':
-                return
-            pprint(vars(self))
-
-        # DDOS
-
-        def get_ips_inner(msg_data: Any, msg_address: Address):
+        
+        msg_type, msg_data, msg_address = message
+        if msg_type == 'get_ips':
             if msg_address == 'local':
                 pprint(self.get_ips())
             elif msg_address == 'daemon':
                 self.save_ips_to_file()
             else:
                 return
-
-        def show_children(msg_data: Any, msg_address: Address):
+        elif msg_type == 'show_children':
             if not msg_address == 'local':
                 return
             node = self.tree.get_node_by_content(str(msg_data))
             node.print()
-
-        commands: Dict[str, Callable[[Any, Address], Any]] = {
-            'new_block': new_block_inner,
-            'new_transaction': new_transaction_inner,
-            'resolve_conflict': resolve_conflict_inner,
-            'save': save_chain,
-            'dump': dump_vars,
-            'get_block': get_block_inner,
-            'new_header': new_header_inner,
-            'get_ips': get_ips_inner,
-            'show_children': show_children
-        }
-
-        def processor(msg_type: str, msg_data: Any,
-                      msg_address: Address) -> Any:
-            commands[msg_type](msg_data, msg_address)
-
-        return processor
+        else:
+            super(DDosChain, self).process_message(message)

@@ -62,7 +62,7 @@ def receive_msg(msg_type: str, msg_data: Any, msg_address: Address,
     elif msg_type == 'exit' and msg_address == 'local':
         sys.exit()
     else:
-        processor(msg_type, msg_data, msg_address)
+        processor((msg_type, msg_data, msg_address))
 
 
 def blockchain_loop(blockchain: Blockchain, processor):
@@ -193,7 +193,7 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
         my_blockchain = DNSBlockChain(VERSION, send_queue, gui_send_queue)
     else:
         my_blockchain = PoW_Blockchain(VERSION, send_queue, gui_send_queue)
-    my_blockchain_processor = my_blockchain.process_message()
+    my_blockchain_processor = my_blockchain.get_message_processor()
 
     # Create networking thread
     networker = threading.Thread(
@@ -229,6 +229,30 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
     return keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread, dns
 
 
+def get_command():
+    """ Gets a command from the cli and normalizes it
+    """
+    try:
+        command = input()
+    except KeyboardInterrupt:
+        print('Detected Keyboard interrupt, exiting program')
+        command = 'exit'
+
+    command = command.lower().strip()
+    command = re.sub(r'\s\s*', ' ', command)
+    return command
+
+
+def validate_ip(ip: str):
+    """ Takes an ip_address string and validates it
+    """
+    try:
+        socket.inet_aton(ip)
+        return True
+    except OSError:
+        return False
+
+
 def main(argv):
     """ Main function of the program.
 
@@ -241,26 +265,18 @@ def main(argv):
 
     # User Interaction
     while True:
-
+        command = None
         if gui_thread.is_alive():
             if not gui_receive_queue.empty():
                 command = gui_receive_queue.get(block=True)
                 print('Command from gui: {}'.format(command))
             else:
                 continue
-        else:
+
+        if not command:
             print('Action: ')
+            command = get_command()
 
-            try:
-                command = input()
-            except KeyboardInterrupt:
-                print('Detected Keyboard interrupt, exiting program')
-                command = 'exit'
-
-        command = command.lower().strip()
-        command = re.sub(r'\s\s*', ' ', command)
-
-        # gui_send_queue.put(command)
         if command == 'help':
             help_str = (""" Available commands:
                 help: prints commands
@@ -393,12 +409,7 @@ keystore
                 print('Command not supported!')
                 continue
             t = command.split(' ')
-            valid_ip = True
-            try:
-                socket.inet_aton(t[2])
-            except OSError:
-                valid_ip = False
-            if not valid_ip:
+            if not validate_ip(t[2]):
                 print('Not a valid ip')
                 continue
             recipient = '0'

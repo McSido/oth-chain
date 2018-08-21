@@ -56,37 +56,11 @@ class DNSBlockChain(PoW_Blockchain):
         self.load_chain()  # overwrite?
         self.auctions: OrderedDict[int, List[Tuple[DNS_Transaction, DNS_Transaction]]] = OrderedDict()
 
-    def new_transaction(self, transaction: Transaction):
-        """ Add a new transaction to the blockchain.
-            Overwrites new_transaction from blockchain.py
-            If the receiver is '0', and the domain operation is 'transfer',
-            an auction for that domain is started.
-            If the receiver is '0', and the domain opeartion is 'b',
-            a bid for that domain is issued.
-
-        Args:
-            transaction: Transaction that should be added.
-        """
-        # Make sure, only one mining reward is granted per block
-        for pool_transaction in self.transaction_pool:
-            if pool_transaction.sender == '0' and \
-                    pool_transaction.signature == '0':
-                print_debug_info(
-                    'This block already granted a mining transaction!')
-                return
-        if transaction in self.latest_block().transactions:
-            return
-        if self.validate_transaction(transaction):
-            self.transaction_pool.append(transaction)
-            self.send_queue.put(('new_transaction', transaction, 'broadcast'))
-            if self.gui_ready:
-                self.gui_queue.put(('new_transaction', transaction, 'local'))
-            if transaction.recipient == '0' and transaction.data.type == 't':
-                self._auction(transaction)
-            if transaction.recipient == '0' and transaction.data.type == 'b':
-                self._bid(transaction)
-        else:
-            print_debug_info('Invalid transaction')
+    def check_auction(self, transaction: DNS_Transaction):
+        if transaction.recipient == '0' and transaction.data.type == 't':
+            self._auction(transaction)
+        if transaction.recipient == '0' and transaction.data.type == 'b':
+            self._bid(transaction)
 
     def validate_transaction(self, transaction: DNS_Transaction, mining: bool = False) -> bool:
         """ Validates a given transaction.
@@ -142,18 +116,7 @@ class DNSBlockChain(PoW_Blockchain):
 
             if validate_hash == transaction_hash:
                 print_debug_info('Signature OK')
-                balance = self.check_balance(
-                    transaction.sender, transaction.timestamp)
-                if balance >= transaction.amount + transaction.fee:
-                    print_debug_info(
-                        'Balance sufficient, transaction is valid')
-                    return True
-                print_debug_info(
-                    'Balance insufficient, transaction is invalid')
-                print_debug_info(
-                    f'Transaction at fault: {transaction} ' +
-                    f'was not covered by balance: {balance}')
-                return False
+                return self.validate_balance(transaction)
             print_debug_info('Wrong Hash')
             return False
 
@@ -161,96 +124,15 @@ class DNSBlockChain(PoW_Blockchain):
             print_debug_info('Bad Signature, Validation Failed')
             return False
 
-    def process_message(self) -> Callable[[str, Any, Address], Any]:
+    def process_message(self, message: Tuple[str, Any, Address]):
         """ Create processor for incoming blockchain messages.
 
                 Returns:
                     Processor (function) that processes blockchain messages.
                 """
 
-        def new_block_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, Block)
-            self.new_block(msg_data)
-
-        def new_transaction_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, DNS_Transaction)
-            if msg_data.sender != '0':
-                self.new_transaction(msg_data)
-
-        def mine(msg_data: Any, msg_address: Address):
-            if msg_address != 'local':
-                return
-            proof = self.create_proof(msg_data)
-            block = self.create_block(proof)
-            fee_sum = 0
-            # Resolve possible auctions:
-            try:
-                auction_list = self.auctions[block.header.index]
-                for auction in auction_list:
-                    block.transactions.extend(self._resolve_auction(auction))
-                self.auctions.pop(block.header.index)
-            except KeyError:
-                pass
-            for transaction in block.transactions:
-                fee_sum += transaction.fee
-            reward_multiplier = math.floor(block.header.index / 10) - 1
-            mining_reward = 50 >> 2 ** reward_multiplier \
-                if reward_multiplier >= 0 else 50
-            block.transactions.append(
-                DNS_Transaction(sender='0', recipient=msg_data,
-                                amount=mining_reward + fee_sum, fee=0,
-                                data=DNS_Data('', '', ''),
-                                timestamp=time.time(), signature='0'))
-
-            root_hash = self.create_merkle_root(block.transactions)
-            real_header = Header(
-                block.header.version,
-                block.header.index,
-                block.header.timestamp,
-                block.header.previous_hash,
-                root_hash,
-                block.header.proof
-            )
-            real_block = Block(real_header, block.transactions)
-            self.new_block(real_block)
-
-        def resolve_conflict_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, list)
-            assert all(isinstance(header, Header) for header in msg_data)
-            self.resolve_conflict(msg_data)
-
-        def print_balance(msg_data: Any, msg_address: Address):
-            balance = self.check_balance(msg_data[0], msg_data[1])
-            if msg_address == 'gui':
-                self.gui_queue.put(('balance', balance, 'local'))
-            else:
-                print(
-                    'Current Balance: ' +
-                    f'{balance}')
-
-        def save_chain(_: Any, msg_address: Address):
-            if msg_address != 'local':
-                return
-            self.save_chain()
-
-        def dump_vars(_: Any, msg_address: Address):
-            if msg_address == 'gui':
-                self.gui_queue.put(('dump', (self.chain, self.transaction_pool), 'local'))
-                self.gui_ready = True
-                return
-            if msg_address != 'local':
-                return
-            pprint(vars(self))
-
-        def get_block_inner(msg_data: Any, msg_address: Address):
-            assert isinstance(msg_data, Header)
-            self.send_block(msg_data, msg_address)
-
-        def new_header_inner(msg_data: Any, _: Address):
-            assert isinstance(msg_data, Header)
-            self.new_header(msg_data)
-
-        def dns_lookup(msg_data: Any, msg_address: Address):
+        msg_type, msg_data, msg_address = message
+        if msg_type == 'dns_lookup':
             if msg_address != 'local':
                 return
             ip = self._resolve_domain_name(msg_data)[0]
@@ -258,25 +140,40 @@ class DNSBlockChain(PoW_Blockchain):
                 print(ip)
             else:
                 print(f'Domain name {msg_data} could not be found.')
+        else:
+            super(DNSBlockChain, self).process_message(message)
 
-        commands: Dict[str, Callable[[Any, Address], Any]] = {
-            'new_block': new_block_inner,
-            'new_transaction': new_transaction_inner,
-            'mine': mine,
-            'resolve_conflict': resolve_conflict_inner,
-            'print_balance': print_balance,
-            'save': save_chain,
-            'dump': dump_vars,
-            'get_block': get_block_inner,
-            'new_header': new_header_inner,
-            'dns_lookup': dns_lookup,
-        }
+    def mine(self, msg_data: Any, msg_address: Address):
+        """ Mines a new block.
+            Args:
+                msg_data: key for the sender.
+                msg_address: -
+        """
+        if msg_address != 'local':
+            return
+        proof = self.create_proof(msg_data)
+        block = self.create_block(proof)
+        fee_sum = 0
+        # Resolve possible auctions:
+        try:
+            auction_list = self.auctions[block.header.index]
+            for auction in auction_list:
+                block.transactions.extend(self._resolve_auction(auction))
+            self.auctions.pop(block.header.index)
+        except KeyError:
+            pass
+        for transaction in block.transactions:
+            fee_sum += transaction.fee
+        reward_multiplier = math.floor(block.header.index / 10) - 1
+        mining_reward = 50 >> 2 ** reward_multiplier \
+            if reward_multiplier >= 0 else 50
+        block.transactions.append(
+            DNS_Transaction(sender='0', recipient=msg_data,
+                            amount=mining_reward + fee_sum, fee=0,
+                            data=DNS_Data('', '', ''),
+                            timestamp=time.time(), signature='0'))
 
-        def processor(msg_type: str, msg_data: Any,
-                      msg_address: Address) -> Any:
-            commands[msg_type](msg_data, msg_address)
-
-        return processor
+        self.new_block(self.prepare_new_block(block))
 
     def _resolve_domain_name(self, name: str) -> Tuple[Any, Any]:
         """ Resolves a given domain name to its' corresponding ip_address as well as its' owner.

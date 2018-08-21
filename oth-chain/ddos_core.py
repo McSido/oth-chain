@@ -64,7 +64,7 @@ def init(port: int, signing_key):
     my_blockchain = DDosChain(core.VERSION,
                               core.send_queue,
                               core.gui_send_queue)
-    my_blockchain_processor = my_blockchain.process_message()
+    my_blockchain_processor = my_blockchain.get_message_processor()
 
     # Create networking thread
     networker = threading.Thread(
@@ -98,7 +98,7 @@ def init(port: int, signing_key):
 def create_transaction(sender: str,
                        timestamp: int,
                        data: DDosData,
-                       signing_key: nacl.signing.SigningKey)\
+                       signing_key: nacl.signing.SigningKey) \
         -> DDosTransaction:
     hash_str = (str(sender) +
                 str(data) +
@@ -131,15 +131,7 @@ def main(argv):
     while True:
 
         print('Action: ')
-
-        try:
-            command = input()
-        except KeyboardInterrupt:
-            print('Detected Keyboard interrupt, exiting program')
-            command = 'exit'
-
-        command = command.lower().strip()
-        command = re.sub(r'\s\s*', ' ', command)
+        command = core.get_command()
 
         if command == 'help':
             help_str = (""" Available commands:
@@ -209,12 +201,7 @@ def main(argv):
         elif re.fullmatch(r'block \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
                           command):
             t = command.split(' ')
-            valid_ip = True
-            try:
-                socket.inet_aton(t[1])
-            except OSError:
-                valid_ip = False
-            if not valid_ip:
+            if not core.validate_ip(t[1]):
                 print('Not a valid ip')
                 continue
             timestamp = time.time()
@@ -228,12 +215,7 @@ def main(argv):
         elif re.fullmatch(r'unblock \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}',
                           command):
             t = command.split(' ')
-            valid_ip = True
-            try:
-                socket.inet_aton(t[1])
-            except OSError:
-                valid_ip = False
-            if not valid_ip:
+            if not core.validate_ip(t[1]):
                 print('Not a valid ip')
                 continue
             timestamp = time.time()
@@ -254,6 +236,11 @@ def main(argv):
 
         elif re.fullmatch(r'public', command):
             print(str(verify_key_hex))
+        elif command == 'save':
+            core.receive_queue.put(('save',
+                                    '',
+                                    'local'
+                                    ))
 
 
 if __name__ == "__main__":
