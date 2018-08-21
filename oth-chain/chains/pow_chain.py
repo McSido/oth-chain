@@ -297,7 +297,9 @@ class PoW_Blockchain(Blockchain):
             Transaction(sender='0', recipient=msg_data,
                         amount=mining_reward + fee_sum, fee=0,
                         timestamp=time.time(), signature='0'))
+        self.new_block(self.prepare_new_block(block))
 
+    def prepare_new_block(self, block: Block) -> Block:
         root_hash = self.create_merkle_root(block.transactions)
         real_header = Header(
             block.header.version,
@@ -308,4 +310,4 @@ class PoW_Blockchain(Blockchain):
             block.header.proof
         )
         real_block = Block(real_header, block.transactions)
-        self.new_block(real_block)
+        return real_block

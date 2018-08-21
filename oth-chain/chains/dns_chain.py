@@ -173,17 +173,7 @@ class DNSBlockChain(PoW_Blockchain):
                             data=DNS_Data('', '', ''),
                             timestamp=time.time(), signature='0'))
 
-        root_hash = self.create_merkle_root(block.transactions)
-        real_header = Header(
-            block.header.version,
-            block.header.index,
-            block.header.timestamp,
-            block.header.previous_hash,
-            root_hash,
-            block.header.proof
-        )
-        real_block = Block(real_header, block.transactions)
-        self.new_block(real_block)
+        self.new_block(self.prepare_new_block(block))
 
     def _resolve_domain_name(self, name: str) -> Tuple[Any, Any]:
         """ Resolves a given domain name to its' corresponding ip_address as well as its' owner.
