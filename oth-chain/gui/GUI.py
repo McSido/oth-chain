@@ -4,6 +4,7 @@ import threading
 import time
 
 import math
+from typing import Tuple, Any
 
 import nacl.encoding
 import nacl.signing
@@ -11,6 +12,7 @@ import nacl.utils
 
 from utils import Keystore, load_key, save_key
 from chains import Block, Transaction
+from networking import Address
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QWidget, QVBoxLayout, QTabWidget, QTreeWidget, \
@@ -45,8 +47,6 @@ class ChainGUI(QMainWindow):
 
     def __init__(self, keystore: Keystore):
         super(ChainGUI, self).__init__()
-        self.lineEditHistory = list()
-        self.lineHistoryCounter = len(self.lineEditHistory)
         self.keystore = keystore
 
     def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
@@ -79,25 +79,29 @@ class ChainGUI(QMainWindow):
             Receives messages and calls the appropriate functions.
         """
         while True:
-            msg_type, msg_data, msg_address = self.gui_queue.get(block=True)
-            if msg_type == 'new_block':
-                self.splitter.widget(0).chain_tab.new_block(msg_data)
-                self.splitter.widget(1).request_balance()
-            elif msg_type == 'new_transaction':
-                self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
-            elif msg_type == 'dump':
-                self.splitter.widget(0).chain_tab.load_data(msg_data)
-                self.splitter.widget(1).request_balance()
-            elif msg_type == 'active_peer':
-                self.splitter.widget(0).peers_tab.update_peers('active', msg_data)
-            elif msg_type == 'inferred_peer':
-                self.splitter.widget(0).peers_tab.update_peers('inferred', msg_data)
-            elif msg_type == 'inactive_peer':
-                self.splitter.widget(0).peers_tab.update_peers('inactive', msg_data)
-            elif msg_type == 'signing_key':
-                self.splitter.widget(1).update_signing_key(msg_data)
-            elif msg_type == 'balance':
-                self.splitter.widget(1).update_balance(msg_data)
+            self.handle_message(*self.gui_queue.get(block=True))
+
+    def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
+        """ Gets a message and responds to it accordingly
+        """
+        if msg_type == 'new_block':
+            self.splitter.widget(0).chain_tab.new_block(msg_data)
+            self.splitter.widget(1).request_balance()
+        elif msg_type == 'new_transaction':
+            self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
+        elif msg_type == 'dump':
+            self.splitter.widget(0).chain_tab.load_data(msg_data)
+            self.splitter.widget(1).request_balance()
+        elif msg_type == 'active_peer':
+            self.splitter.widget(0).peers_tab.update_peers('active', msg_data)
+        elif msg_type == 'inferred_peer':
+            self.splitter.widget(0).peers_tab.update_peers('inferred', msg_data)
+        elif msg_type == 'inactive_peer':
+            self.splitter.widget(0).peers_tab.update_peers('inactive', msg_data)
+        elif msg_type == 'signing_key':
+            self.splitter.widget(1).update_signing_key(msg_data)
+        elif msg_type == 'balance':
+            self.splitter.widget(1).update_balance(msg_data)
 
     def closeEvent(self, a0: QtGui.QCloseEvent):
         """ Event that gets called on hitting the close-button of the GUI.
@@ -215,7 +219,8 @@ class ChainHistoryWidget(QWidget):
         item = self.create_transaction_item(transaction, self.transaction_pool_item.childCount())
         self.transaction_pool_item.insertChild(0, item)
 
-    def create_transaction_item(self, transaction: Transaction, number: int) -> QTreeWidgetItem:
+    @staticmethod
+    def create_transaction_item(transaction: Transaction, number: int) -> QTreeWidgetItem:
         """ Takes a transaction object and builds an item for the tree widget from it.
             Args:
                 transaction: the transaction object.
