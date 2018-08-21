@@ -1,0 +1,3 @@
+[run]
+omit = oth-chain/gui/*
+       oth-chain/tests/*
