@@ -20,7 +20,7 @@ from networking import Address
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QWidget, QVBoxLayout, QTabWidget, QTreeWidget, \
     QScrollBar, QTreeWidgetItem, QListView, QPushButton, QLineEdit, QGroupBox, QFormLayout, QLabel, QHBoxLayout, \
-    QFileDialog, QSpinBox
+    QFileDialog, QSpinBox, QComboBox, QRadioButton
 from PyQt5 import QtCore, QtGui
 from queue import Queue
 
@@ -46,10 +46,35 @@ class DNSChainGUI(GUI.ChainGUI):
         as the base class as well as additional functions specifically for
         the DNS-Chain.
     """
+
+    def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
+        """ Initialises the ui and sets the queues.
+            Starts the thread for receiving messages.
+            Args:
+                chain_queue: Queue for messages addressed to the blockchain
+                gui_queue: Queue for messages addressed to the GUI
+                command_queue: Queue for commands to the core thread
+        """
+        self.splitter = QSplitter()
+        self.chain_queue = chain_queue
+        self.gui_queue = gui_queue
+        self.command_queue = command_queue
+        self.splitter.addWidget(TabWidget(self))
+        self.splitter.addWidget(TransactionWidget(self))
+        self.setCentralWidget(self.splitter)
+        self.setWindowTitle('oth-chain')
+        self.setGeometry(500, 200, 1000, 500)
+        self.show()
+
+        message_thread = threading.Thread(
+            target=self.wait_for_message
+        )
+        message_thread.setDaemon(True)
+        message_thread.start()
     
     def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
         if msg_type == 'auction':
-            self.splitter[0].auction_tab.new_auction(msg_data)
+            self.splitter[0].auction_tab.new_auction(*msg_data)
             # add to transaction widget
         elif msg_type == 'auction_expired':
             self.splitter[0].auction_tab.auction_expired(msg_data)
@@ -150,10 +175,11 @@ class AuctionWidget(QWidget):
 
         self.auctions.addTopLevelItem(offer_item)
 
-    def auction_expired(self):
+    def auction_expired(self, offer: DNS_Transaction):
         """ Removes the latest auction from the tree
         """
-        self.auctions.takeTopLevelItem(0)
+        offer_item = self.auctions.findItems(offer.data.domain_name, QtCore.Qt.MatchExactly, column=1)[0]
+        self.auctions.takeTopLevelItem(self.auctions.indexOfTopLevelItem(offer_item))
 
     def bid_placed(self, bid: DNS_Transaction):
         """ Removes the bid_item from the offer_item and replaces it
@@ -179,5 +205,118 @@ class TransactionWidget(GUI.TransactionWidget):
         Args:
             parent: the parent widget.
     """
-    pass
+    def __init__(self, parent):
+        super(TransactionWidget, self).__init__(parent)
 
+        self.current_operation = 'Register'
+
+        self.dns_box = QGroupBox()
+
+        self.dns_box_layout = QVBoxLayout()
+        self.dns_box_form = QFormLayout()
+
+        self.owned_domain_list = []
+        self.owned_domains = QComboBox()
+
+        self.auction_domain_list = []
+        self.auctioned_domains = QComboBox()
+
+        self.dns_recipient_edit = QLineEdit()
+        self.domain_name_edit = QLineEdit()
+        self.ip_address_edit = QLineEdit()
+
+        self.bid_amount_edit = QSpinBox()
+
+        self.resolve_edit = QLineEdit()
+        self.resolve_button = QPushButton('Resolve domain name')
+
+        self.dns_send_button = QPushButton('Confirm')
+
+        self.dns_error_label = QLabel()
+
+        self.register_radio = QRadioButton('Register')
+        self.transfer_radio = QRadioButton('Transfer')
+        self.auction_radio = QRadioButton('Auction')
+        self.bid_radio = QRadioButton('Bid')
+
+        self.prepare_dns_form()
+
+    def prepare_dns_form(self):
+        self.dns_box_form.addRow(QLabel('DNS Operations:'))
+        self.register_radio.toggled.connect(lambda: self.operation_changed(self.register_radio))
+        self.transfer_radio.toggled.connect(lambda: self.operation_changed(self.transfer_radio))
+        self.auction_radio.toggled.connect(lambda: self.operation_changed(self.auction_radio))
+        self.bid_radio.toggled.connect(lambda: self.operation_changed(self.bid_radio))
+
+        radio_hbox = QHBoxLayout()
+        radio_hbox.addWidget(self.register_radio)
+        radio_hbox.addWidget(self.transfer_radio)
+        radio_hbox.addWidget(self.auction_radio)
+        radio_hbox.addWidget(self.bid_radio)
+        self.register_radio.setChecked(True)
+
+        self.dns_box_form.addRow(radio_hbox)
+
+        self.domain_name_edit.setPlaceholderText('Domain name')
+        self.ip_address_edit.setPlaceholderText('IP address')
+
+        domain_ip_hbox = QHBoxLayout()
+        domain_ip_hbox.addWidget(self.domain_name_edit)
+        domain_ip_hbox.addWidget(self.ip_address_edit)
+
+        self.dns_box_form.addRow(domain_ip_hbox)
+
+        selection_hbox = QHBoxLayout()
+        selection_hbox.addWidget(QLabel('Owned Domains:'))
+        selection_hbox.addWidget(self.owned_domains)
+        selection_hbox.addWidget(QLabel('Auctioned Domains:'))
+        selection_hbox.addWidget(self.auctioned_domains)
+
+        self.dns_box_form.addRow(selection_hbox)
+
+        self.dns_recipient_edit.setPlaceholderText('Recipient')
+
+        recipient_amount_hbox = QHBoxLayout()
+        recipient_amount_hbox.addWidget(self.dns_recipient_edit)
+        recipient_amount_hbox.addWidget(self.bid_amount_edit)
+
+        self.dns_box_form.addRow(recipient_amount_hbox)
+
+        self.resolve_edit.setPlaceholderText('Domain name')
+
+        resolve_hbox = QHBoxLayout()
+        resolve_hbox.addWidget(self.resolve_edit)
+        resolve_hbox.addWidget(self.resolve_button)
+
+        self.dns_box_form.addRow(resolve_hbox)
+
+        self.dns_box_form.addRow(self.dns_send_button)
+
+        self.dns_box_layout.addLayout(self.dns_box_form)
+        self.dns_box.setLayout(self.dns_box_layout)
+        self.layout.addWidget(self.dns_box)
+
+    def valid_ip(self):
+        pass
+
+    def operation_changed(self, button: QRadioButton):
+        if not button.isChecked():
+            return
+        for widget in [self.bid_amount_edit, self.dns_recipient_edit, self.owned_domains, self.auctioned_domains,
+                       self.ip_address_edit, self.domain_name_edit]:
+            widget.setEnabled(False)
+        if button.text() == 'Register':
+            self.domain_name_edit.setEnabled(True)
+            self.ip_address_edit.setEnabled(True)
+            self.current_operation = 'Register'
+        elif button.text() == 'Transfer':
+            self.owned_domains.setEnabled(True)
+            self.dns_recipient_edit.setEnabled(True)
+            self.current_operation = 'Transfer'
+        elif button.text() == 'Auction':
+            self.owned_domains.setEnabled(True)
+            self.current_operation = 'Auction'
+        elif button.text() == 'Bid':
+            self.auctioned_domains.setEnabled(True)
+            self.bid_amount_edit.setEnabled(True)
+            self.current_operation = 'Bid'

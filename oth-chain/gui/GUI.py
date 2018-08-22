@@ -477,13 +477,37 @@ class TransactionWidget(QWidget):
         self.user_group_box_form = QFormLayout()
 
         self.load_key_button = QPushButton('Load private Key')
-        self.load_key_button.clicked.connect(self.load_signing_key)
         self.export_key_button = QPushButton('Export public Key')
-        key_hbox = QHBoxLayout()
+        self.save_key_button = QPushButton('Save private Key')
         self.user_field = QLineEdit()
+        self.mine_button = QPushButton('Start Mining')
+
+        self.transaction_group_box = QGroupBox()
+
+        self.transaction_group_box_layout = QVBoxLayout()
+        self.transaction_group_box_form = QFormLayout()
+
+        self.balance_label = QLabel('Current Balance: 0')
+        self.recipient_edit = QLineEdit()
+        self.amount_edit = QSpinBox()
+        self.send_button = QPushButton('Send')
+
+        self.fee_label = QLabel('Fee: 1')
+        self.error_label = QLabel()
+
+        self.setLayout(self.layout)
+
+        self.prepare_user_form()
+        self.prepare_transaction_form()
+
+    def prepare_user_form(self):
+        """ Prepares the user form of this widget
+        """
+        self.load_key_button.clicked.connect(self.load_signing_key)
+        key_hbox = QHBoxLayout()
         self.user_field.setEnabled(False)
         self.user_field.setPlaceholderText('Key')
-        self.save_key_button = QPushButton('Save private Key')
+
         key_hbox.addWidget(self.save_key_button)
         key_hbox.addWidget(self.load_key_button)
         key_hbox.addWidget(self.export_key_button)
@@ -494,7 +518,6 @@ class TransactionWidget(QWidget):
         self.user_group_box_form.addRow(QLabel('User:'), self.user_field)
         self.user_group_box_form.addRow(key_hbox)
 
-        self.mine_button = QPushButton('Start Mining')
         self.mine_button.clicked.connect(self.mine)
         self.user_group_box_form.addRow(self.mine_button)
 
@@ -502,23 +525,17 @@ class TransactionWidget(QWidget):
         self.user_group_box.setLayout(self.user_group_box_layout)
         self.layout.addWidget(self.user_group_box)
 
-        self.transaction_group_box = QGroupBox()
-
-        self.transaction_group_box_layout = QVBoxLayout()
-        self.transaction_group_box_form = QFormLayout()
-
+    def prepare_transaction_form(self):
+        """ Prepares the transaction form of this widget
+        """
         self.transaction_group_box_form.addRow(QLabel('New Transaction:'))
-        self.balance_label = QLabel('Current Balance: 0')
         self.transaction_group_box_form.addRow(self.balance_label)
-        self.recipient_edit = QLineEdit()
+
         self.recipient_edit.setPlaceholderText('Recipient')
-        self.amount_edit = QSpinBox()
         self.amount_edit.valueChanged.connect(self.update_fee)
 
-        self.send_button = QPushButton('Send')
         self.send_button.clicked.connect(self.send_transaction)
 
-        self.fee_label = QLabel('Fee: 1')
         transaction_hbox = QHBoxLayout()
         transaction_hbox.addWidget(self.amount_edit)
         transaction_hbox.addWidget(self.fee_label)
@@ -534,11 +551,8 @@ class TransactionWidget(QWidget):
         self.transaction_group_box.setLayout(self.transaction_group_box_layout)
         self.layout.addWidget(self.transaction_group_box)
 
-        self.error_label = QLabel()
         self.error_label.hide()
         self.transaction_group_box_form.addRow(self.error_label)
-
-        self.setLayout(self.layout)
 
     def mine(self):
         """ Send a mine message to the blockchain

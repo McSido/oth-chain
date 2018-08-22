@@ -231,10 +231,12 @@ class DNSBlockChain(PoW_Blockchain):
             self.auctions[i + MAX_AUCTION_TIME]
         except KeyError:
             self.auctions[i + MAX_AUCTION_TIME] = []
+        auction = (transaction, bid_transaction)
         self.auctions[i + MAX_AUCTION_TIME].append((transaction, bid_transaction))
+        if self.gui_ready:
+            self.gui_queue.put(('auction', (auction, str(i + MAX_AUCTION_TIME)), 'local'))
 
-    @staticmethod
-    def _resolve_auction(auction: Tuple[DNS_Transaction, DNS_Transaction]):
+    def _resolve_auction(self, auction: Tuple[DNS_Transaction, DNS_Transaction]):
         """ Resolves an auction given through a  tuple of transactions by creating
             two transactions 1) the transfer of the domain to the highest bidder and
             2) the payment of the bid to the initiator of the auction.
@@ -260,6 +262,8 @@ class DNSBlockChain(PoW_Blockchain):
         p_timestamp = time.time()
         p_data = DNS_Data('', '', '')
         payment_transaction = DNS_Transaction(p_sender, p_recipient, p_amount, p_fee, p_timestamp, p_data, '1')
+        if self.gui_ready:
+            self.gui_queue.put(('auction_expired', t1, 'local'))
 
         return [transfer_transaction, payment_transaction]
 
@@ -277,6 +281,9 @@ class DNSBlockChain(PoW_Blockchain):
                 if auction[0].data.domain_name == transaction.data.domain_name:
                     reimburse_transaction = auction[1]
                     auction_list[i] = (auction[0], transaction)
+                    break
+        if self.gui_ready:
+            self.gui_queue.put(('new_bid', transaction, 'local'))
 
         if not reimburse_transaction.sender == '0':
             t = DNS_Transaction(
