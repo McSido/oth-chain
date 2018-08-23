@@ -133,13 +133,19 @@ class DNSBlockChain(PoW_Blockchain):
 
         msg_type, msg_data, msg_address = message
         if msg_type == 'dns_lookup':
-            if msg_address != 'local':
-                return
-            ip = self._resolve_domain_name(msg_data)[0]
-            if ip:
-                print(ip)
+            ip = self._resolve_domain_name(msg_data)
+            result = f'Domain name {msg_data} could not be found.' if not ip[0] else ip
+            print(result)
+            if self.gui_ready:
+                self.gui_queue.put(('resolved', result, 'local'))
+        elif msg_type == 'get_auctions':
+            if msg_address == 'gui':
+                for key, auction_list in self.auctions.items():
+                    for auction in auction_list:
+                        self.gui_queue.put(('auction', (auction, str(key)), 'local'))
             else:
-                print(f'Domain name {msg_data} could not be found.')
+                print(self.auctions)
+
         else:
             super(DNSBlockChain, self).process_message(message)
 

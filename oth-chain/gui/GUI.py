@@ -219,8 +219,8 @@ class ChainHistoryWidget(QWidget):
         item = self.create_transaction_item(transaction, self.transaction_pool_item.childCount())
         self.transaction_pool_item.insertChild(0, item)
 
-    @staticmethod
-    def create_transaction_item(transaction: Transaction, number: int) -> QTreeWidgetItem:
+    @classmethod
+    def create_transaction_item(cls, transaction: Transaction, number: int) -> QTreeWidgetItem:
         """ Takes a transaction object and builds an item for the tree widget from it.
             Args:
                 transaction: the transaction object.

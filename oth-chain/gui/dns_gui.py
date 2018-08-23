@@ -6,6 +6,7 @@ import hashlib
 import sys
 import threading
 import time
+import socket
 
 import math
 
@@ -74,14 +75,16 @@ class DNSChainGUI(GUI.ChainGUI):
     
     def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
         if msg_type == 'auction':
-            self.splitter[0].auction_tab.new_auction(*msg_data)
-            # add to transaction widget
+            self.splitter.widget(0).auction_tab.new_auction(*msg_data)
+            self.splitter.widget(1).add_to_auction_list(msg_data[0][0].data.domain_name)
         elif msg_type == 'auction_expired':
-            self.splitter[0].auction_tab.auction_expired(msg_data)
+            self.splitter.widget(0).auction_tab.auction_expired(msg_data)
             # remove from transaction widget
         elif msg_type == 'new_bid':
-            self.splitter[0].auction_tab.bid_placed(msg_data)
+            self.splitter.widget(0).auction_tab.bid_placed(msg_data)
             # update transaction widget
+        elif msg_type == 'resolved':
+            self.splitter.widget(1).domain_resolved(msg_data)
         else:
             super(DNSChainGUI, self).handle_message(msg_type, msg_data, msg_address)
 
@@ -115,9 +118,9 @@ class ChainHistoryWidget(GUI.ChainHistoryWidget):
     """ Widget that displays the blockchain in a treelike fashion.
     """
 
-    @staticmethod
-    def create_transaction_item(transaction: DNS_Transaction, number: int) -> QTreeWidgetItem:
-        item = super().create_transaction_item(transaction, number)
+    @classmethod
+    def create_transaction_item(cls, transaction: DNS_Transaction, number: int) -> QTreeWidgetItem:
+        item = super(ChainHistoryWidget, cls).create_transaction_item(transaction, number)
         if not transaction.data == DNS_Data('', '', ''):
             data = QTreeWidgetItem()
             data.setText(0, 'DNS_Operation: ')
@@ -164,7 +167,7 @@ class AuctionWidget(QWidget):
 
         bid_item = ChainHistoryWidget.create_transaction_item(bid, 0)
         bid_item.setText(0, 'Highest Bid:')
-        bid_item.setText(1, bid.amount)
+        bid_item.setText(1, str(bid.amount))
 
         expiration_item = QTreeWidgetItem()
         expiration_item.setText(0, 'Expires in Block:')
@@ -229,6 +232,7 @@ class TransactionWidget(GUI.TransactionWidget):
 
         self.resolve_edit = QLineEdit()
         self.resolve_button = QPushButton('Resolve domain name')
+        self.resolve_label = QLabel()
 
         self.dns_send_button = QPushButton('Confirm')
 
@@ -240,6 +244,8 @@ class TransactionWidget(GUI.TransactionWidget):
         self.bid_radio = QRadioButton('Bid')
 
         self.prepare_dns_form()
+
+        self.chain_queue.put(('get_auctions', '', 'gui'))
 
     def prepare_dns_form(self):
         self.dns_box_form.addRow(QLabel('DNS Operations:'))
@@ -259,6 +265,7 @@ class TransactionWidget(GUI.TransactionWidget):
 
         self.domain_name_edit.setPlaceholderText('Domain name')
         self.ip_address_edit.setPlaceholderText('IP address')
+        self.ip_address_edit.editingFinished.connect(self.valid_ip)
 
         domain_ip_hbox = QHBoxLayout()
         domain_ip_hbox.addWidget(self.domain_name_edit)
@@ -283,21 +290,42 @@ class TransactionWidget(GUI.TransactionWidget):
         self.dns_box_form.addRow(recipient_amount_hbox)
 
         self.resolve_edit.setPlaceholderText('Domain name')
+        self.resolve_button.clicked.connect(self.resolve)
 
         resolve_hbox = QHBoxLayout()
         resolve_hbox.addWidget(self.resolve_edit)
         resolve_hbox.addWidget(self.resolve_button)
 
         self.dns_box_form.addRow(resolve_hbox)
+        self.dns_box_form.addRow(self.resolve_label)
 
         self.dns_box_form.addRow(self.dns_send_button)
+
+        self.dns_box_form.addRow(self.dns_error_label)
 
         self.dns_box_layout.addLayout(self.dns_box_form)
         self.dns_box.setLayout(self.dns_box_layout)
         self.layout.addWidget(self.dns_box)
 
+    def domain_resolved(self, result: Any):
+        if type(result) == str:
+            self.resolve_label.setText(result)
+        else:
+            self.resolve_label.setText(f'IP: {result[0]}, Owner: {str(result[1])}')
+
+    def resolve(self):
+        self.chain_queue.put(('dns_lookup', self.resolve_edit.text(), 'gui'))
+
+    def add_to_auction_list(self, domain_name: str):
+        self.auction_domain_list.append(domain_name)
+        self.auctioned_domains.addItem(domain_name)
+
     def valid_ip(self):
-        pass
+        try:
+            socket.inet_aton(self.ip_address_edit.text())
+            self.dns_error_label.setText('')
+        except OSError:
+            self.dns_error_label.setText("Invalid IP Address!")
 
     def operation_changed(self, button: QRadioButton):
         if not button.isChecked():
