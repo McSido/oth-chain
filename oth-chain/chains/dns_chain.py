@@ -145,7 +145,18 @@ class DNSBlockChain(PoW_Blockchain):
                         self.gui_queue.put(('auction', (auction, str(key)), 'local'))
             else:
                 print(self.auctions)
-
+        elif msg_type == 'owned_domains':
+            if msg_address == 'gui':
+                domains = set()
+                for block_transaction in list(self.chain.values())[::-1]:
+                    for transaction in block_transaction[::-1]:
+                        if transaction.data.type == 't' and transaction.recipient == msg_data:
+                            domains.add(transaction.data.domain_name)
+                        elif transaction.data.type == 'r' or transaction.data.type == 'u' \
+                                and transaction.sender == msg_data:
+                            domains.add(transaction.data.domain_name)
+                for domain in domains:
+                    self.gui_queue.put(('owned_domain', domain, 'local'))
         else:
             super(DNSBlockChain, self).process_message(message)
 

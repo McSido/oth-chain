@@ -574,31 +574,37 @@ class TransactionWidget(QWidget):
             self.error_label.setText('Error: Recipient name could not be found in the keystore!')
             self.error_label.show()
             return
-        timestamp = time.time()
-        # fee equals 5% of the transaction amount - at least 1
         amount = self.amount_edit.value()
         fee = math.ceil(amount * 0.05)
+
         if amount + fee > int(self.balance_label.text().split(': ')[1]):
             self.error_label.setText('Error: Current balance is not sufficient for this transaction!')
             self.error_label.show()
             return
+
+        transaction = self.prepare_transaction(recipient, amount, fee, time.time())
+
+        self.chain_queue.put(('new_transaction',
+                              transaction,
+                              'gui'
+                              ))
+
+    def prepare_transaction(self, recipient, amount, fee, timestamp):
         transaction_hash = hashlib. \
             sha256((str(self.verify_key_hex) +
                     str(recipient) + str(amount)
                     + str(fee) +
                     str(timestamp)).encode()).hexdigest()
 
-        self.chain_queue.put(('new_transaction',
-                              Transaction(self.verify_key_hex,
-                                          recipient,
-                                          amount,
-                                          fee,
-                                          timestamp,
-                                          self.signing_key.sign(
-                                              transaction_hash.encode())
-                                          ),
-                              'gui'
-                              ))
+        transaction = Transaction(self.verify_key_hex,
+                                  recipient,
+                                  amount,
+                                  fee,
+                                  timestamp,
+                                  self.signing_key.sign(
+                                      transaction_hash.encode())
+                                  )
+        return transaction
 
     def load_signing_key(self):
         """ Loads a private key, to change the current user.

@@ -40,7 +40,7 @@ def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keys
     ex.initUI(chain_queue, gui_queue, command_queue)
 
     sys.exit(app.exec_())
-    
+
 
 class DNSChainGUI(GUI.ChainGUI):
     """ Provides a GUI for the DNS-Chain. Provides the same functionality
@@ -72,19 +72,23 @@ class DNSChainGUI(GUI.ChainGUI):
         )
         message_thread.setDaemon(True)
         message_thread.start()
-    
+
     def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
         if msg_type == 'auction':
             self.splitter.widget(0).auction_tab.new_auction(*msg_data)
             self.splitter.widget(1).add_to_auction_list(msg_data[0][0].data.domain_name)
         elif msg_type == 'auction_expired':
             self.splitter.widget(0).auction_tab.auction_expired(msg_data)
-            # remove from transaction widget
+            self.splitter.widget(1).remove_from_auctions(msg_data.data.domain_name)
         elif msg_type == 'new_bid':
             self.splitter.widget(0).auction_tab.bid_placed(msg_data)
-            # update transaction widget
         elif msg_type == 'resolved':
             self.splitter.widget(1).domain_resolved(msg_data)
+        elif msg_type == 'owned_domain':
+            self.splitter.widget(1).add_to_owned_domains(msg_data)
+        elif msg_type == 'new_transaction':
+            self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
+            self.splitter.widget(1).react_to_transaction(msg_data)
         else:
             super(DNSChainGUI, self).handle_message(msg_type, msg_data, msg_address)
 
@@ -131,6 +135,7 @@ class ChainHistoryWidget(GUI.ChainHistoryWidget):
             domain.setText(1, transaction.data.domain_name)
             ip.setText(0, 'IP-Address:')
             ip.setText(1, transaction.data.ip_address)
+            data.addChildren([operation, domain, ip])
             item.addChild(data)
         return item
 
@@ -196,7 +201,7 @@ class AuctionWidget(QWidget):
 
         bid_item = ChainHistoryWidget.create_transaction_item(bid, 0)
         bid_item.setText(0, 'Highest Bid:')
-        bid_item.setText(1, bid.amount)
+        bid_item.setText(1, str(bid.amount))
 
         offer_item.addChild(bid_item)
 
@@ -208,6 +213,7 @@ class TransactionWidget(GUI.TransactionWidget):
         Args:
             parent: the parent widget.
     """
+
     def __init__(self, parent):
         super(TransactionWidget, self).__init__(parent)
 
@@ -239,6 +245,7 @@ class TransactionWidget(GUI.TransactionWidget):
         self.dns_error_label = QLabel()
 
         self.register_radio = QRadioButton('Register')
+        self.update_radio = QRadioButton('Update')
         self.transfer_radio = QRadioButton('Transfer')
         self.auction_radio = QRadioButton('Auction')
         self.bid_radio = QRadioButton('Bid')
@@ -250,12 +257,14 @@ class TransactionWidget(GUI.TransactionWidget):
     def prepare_dns_form(self):
         self.dns_box_form.addRow(QLabel('DNS Operations:'))
         self.register_radio.toggled.connect(lambda: self.operation_changed(self.register_radio))
+        self.update_radio.toggled.connect(lambda: self.operation_changed(self.update_radio))
         self.transfer_radio.toggled.connect(lambda: self.operation_changed(self.transfer_radio))
         self.auction_radio.toggled.connect(lambda: self.operation_changed(self.auction_radio))
         self.bid_radio.toggled.connect(lambda: self.operation_changed(self.bid_radio))
 
         radio_hbox = QHBoxLayout()
         radio_hbox.addWidget(self.register_radio)
+        radio_hbox.addWidget(self.update_radio)
         radio_hbox.addWidget(self.transfer_radio)
         radio_hbox.addWidget(self.auction_radio)
         radio_hbox.addWidget(self.bid_radio)
@@ -299,6 +308,8 @@ class TransactionWidget(GUI.TransactionWidget):
         self.dns_box_form.addRow(resolve_hbox)
         self.dns_box_form.addRow(self.resolve_label)
 
+        self.dns_send_button.clicked.connect(self.send_operation)
+
         self.dns_box_form.addRow(self.dns_send_button)
 
         self.dns_box_form.addRow(self.dns_error_label)
@@ -324,8 +335,10 @@ class TransactionWidget(GUI.TransactionWidget):
         try:
             socket.inet_aton(self.ip_address_edit.text())
             self.dns_error_label.setText('')
+            return True
         except OSError:
             self.dns_error_label.setText("Invalid IP Address!")
+            return False
 
     def operation_changed(self, button: QRadioButton):
         if not button.isChecked():
@@ -337,6 +350,10 @@ class TransactionWidget(GUI.TransactionWidget):
             self.domain_name_edit.setEnabled(True)
             self.ip_address_edit.setEnabled(True)
             self.current_operation = 'Register'
+        elif button.text() == 'Update':
+            self.ip_address_edit.setEnabled(True)
+            self.owned_domains.setEnabled(True)
+            self.current_operation = 'Update'
         elif button.text() == 'Transfer':
             self.owned_domains.setEnabled(True)
             self.dns_recipient_edit.setEnabled(True)
@@ -348,3 +365,92 @@ class TransactionWidget(GUI.TransactionWidget):
             self.auctioned_domains.setEnabled(True)
             self.bid_amount_edit.setEnabled(True)
             self.current_operation = 'Bid'
+
+    def remove_from_auctions(self, domain_name: str):
+        self.auction_domain_list.remove(domain_name)
+        index = self.auctioned_domains.findText(domain_name)
+        self.auctioned_domains.removeItem(index)
+
+    def prepare_transaction(self, recipient, amount, fee, timestamp, dns_data=DNS_Data('', '', '')):
+        transaction_hash = hashlib. \
+            sha256((str(self.verify_key_hex) +
+                    str(recipient) + str(amount)
+                    + str(fee) +
+                    str(timestamp) + str(dns_data)).encode()).hexdigest()
+
+        transaction = DNS_Transaction(self.verify_key_hex,
+                                      recipient,
+                                      amount,
+                                      fee,
+                                      timestamp,
+                                      dns_data,
+                                      self.signing_key.sign(
+                                          transaction_hash.encode())
+                                      )
+        return transaction
+
+    def send_operation(self):
+        self.dns_error_label.setText('')
+        if self.current_operation == 'Register' or self.current_operation == 'Update':
+            coins_required = 20
+        else:
+            coins_required = 1
+        if int(self.balance_label.text().split(': ')[1]) < coins_required:
+            self.dns_error_label.setText(f'Error: {coins_required} coins are required for this operation')
+            return
+        operation = self.current_operation[0].lower()
+        if operation == 't':
+            recipient = self.keystore.resolve_name(self.dns_recipient_edit.text())
+            if recipient == 'Error':
+                self.dns_error_label.setText('Error: Recipient name could not be found in the keystore!')
+                return
+        else:
+            recipient = '0'
+        amount = self.bid_amount_edit.value() if operation == 'b' else 0
+        if int(self.balance_label.text().split(': ')[1]) < amount:
+            self.dns_error_label.setText(f'Error: {coins_required} coins are required for this operation')
+            return
+        fee = coins_required
+        domain_name = ''
+        ip = ''
+        if operation == 'r':
+            domain_name = self.domain_name_edit.text()
+            ip = self.ip_address_edit.text()
+        elif operation == 'u':
+            domain_name = self.owned_domains.currentText()
+            ip = self.ip_address_edit.text()
+        elif operation == 't':
+            domain_name = self.owned_domains.currentText()
+        elif operation == 'a':
+            operation = 't'
+            domain_name = self.owned_domains.currentText()
+        elif operation == 'b':
+            domain_name = self.auctioned_domains.currentText()
+        dns_data = DNS_Data(operation, domain_name, ip)
+        if not self.valid_ip():
+            return
+
+        transaction = self.prepare_transaction(recipient, amount, fee, time.time(), dns_data=dns_data)
+        self.chain_queue.put(('new_transaction',
+                              transaction,
+                              'gui'
+                              ))
+
+    def add_to_owned_domains(self, domain_name: str):
+        self.owned_domain_list.append(domain_name)
+        self.owned_domains.addItem(domain_name)
+
+    def remove_from_owned_domains(self, domain_name: str):
+        self.owned_domain_list.remove(domain_name)
+        index = self.owned_domains.findText(domain_name)
+        self.owned_domains.removeItem(index)
+
+    def react_to_transaction(self, transaction: DNS_Transaction):
+        if transaction.data.type == 't':
+            if transaction.sender == self.verify_key_hex:
+                self.remove_from_owned_domains(transaction.data.domain_name)
+            elif transaction.recipient == self.verify_key_hex:
+                self.add_to_owned_domains(transaction.data.domain_name)
+        elif transaction.data.type == 'r':
+            if transaction.sender == self.verify_key_hex:
+                self.add_to_owned_domains(transaction.data.domain_name)
