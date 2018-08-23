@@ -1,29 +1,20 @@
-from typing import Any, Tuple
-
-from . import GUI
-
 import hashlib
+import socket
 import sys
 import threading
 import time
-import socket
-
-import math
-
-import nacl.encoding
-import nacl.signing
-import nacl.utils
-
-from utils import Keystore, load_key, save_key
-from chains import Block, DNS_Transaction, DNS_Data
-from networking import Address
-
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QWidget, QVBoxLayout, QTabWidget, QTreeWidget, \
-    QScrollBar, QTreeWidgetItem, QListView, QPushButton, QLineEdit, QGroupBox, QFormLayout, QLabel, QHBoxLayout, \
-    QFileDialog, QSpinBox, QComboBox, QRadioButton
-from PyQt5 import QtCore, QtGui
 from queue import Queue
+from typing import Any, Tuple
+
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QApplication, QSplitter, QWidget, QVBoxLayout, QTabWidget, QTreeWidget, \
+    QTreeWidgetItem, QPushButton, QLineEdit, QGroupBox, QFormLayout, QLabel, QHBoxLayout, \
+    QSpinBox, QComboBox, QRadioButton
+from chains import DNS_Transaction, DNS_Data
+from networking import Address
+from utils import Keystore
+
+from . import GUI
 
 
 def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keystore):
