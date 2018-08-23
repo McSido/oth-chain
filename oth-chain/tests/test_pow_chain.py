@@ -246,7 +246,7 @@ class TestPOW(object):
             self.mine_block(bchain2)
 
         bchain2.new_transaction(t)
-        bchain2.process_message(('mine', self.sender_sign, 'local'))
+        bchain2.process_message(('mine', self.sender_verify, 'local'))
 
         self.blockchain.resolve_conflict(bchain2.get_header_chain())
 
