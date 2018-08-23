@@ -22,7 +22,7 @@ import nacl.signing
 import nacl.utils
 
 from chains import Blockchain, DNSBlockChain, DNS_Transaction, DNS_Data, PoW_Blockchain, Transaction
-from gui import gui_loop
+from gui import gui_loop, dns_gui_loop
 from networking import Address, worker
 from utils import Keystore, load_key, save_key, print_debug_info, set_debug
 
@@ -222,8 +222,10 @@ def init(keystore_filename: str, port: int, signing_key, dns: bool):
     keystore = Keystore(keystore_filename)
 
     # gui thread
+    target = dns_gui_loop if dns else gui_loop
+
     gui_thread = threading.Thread(
-        target=gui_loop,
+        target=target,
         args=(gui_send_queue, receive_queue, gui_receive_queue, keystore), )  # daemon=True
 
     return keystore, signing_key, verify_key_hex, networker, blockchain_thread, gui_thread, dns
@@ -486,9 +488,9 @@ keystore
                                'local'
                                ))
         elif command == 'gui':
-            if dns:
-                print('gui not yet supported for DNS Chain')
-                continue
+            # if dns:
+                # print('gui not yet supported for DNS Chain')
+                # continue
             print("open gui")
             gui_thread.start()
             gui_send_queue.put(('signing_key', signing_key, 'local'))
