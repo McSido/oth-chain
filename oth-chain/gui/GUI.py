@@ -270,11 +270,14 @@ class ChainHistoryWidget(QWidget):
             timestamp = time.strftime("%d.%m.%Y %H:%M:%S %Z",
                                       time.gmtime(transaction.timestamp))
             for i in range(self.transaction_pool_item.childCount()):
-                if self.transaction_pool_item.child(i).child(4).text(1) == timestamp:
+                if self.get_timestamp_from_child(self.transaction_pool_item.child(i)) == timestamp:
                     items_to_delete.append(self.transaction_pool_item.child(i))
 
         for item in items_to_delete:
             self.transaction_pool_item.removeChild(item)
+
+    def get_timestamp_from_child(self, child: QTreeWidgetItem):
+        return child.child(4).text(1)
 
 
 class PeerWidget(QWidget):
