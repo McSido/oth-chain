@@ -1,18 +1,19 @@
 import os
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict, namedtuple
 from pathlib import Path
 from pprint import pprint
 from queue import Queue
 from time import time
-from typing import Any, List, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import nacl.encoding
 import nacl.signing
-import serializer
 from nacl.exceptions import BadSignatureError
+
+import serializer
 from utils import Node, print_debug_info
 
-from .blockchain import Blockchain, Block, Address
+from .blockchain import Address, Block, Blockchain
 
 DDosHeader = namedtuple('DDosHeader',
                         ['version',
@@ -110,9 +111,9 @@ class DDosChain(Blockchain):
             self.tree.remove_node(node_to_remove, False)
             index_list = []
             # Remove all ips blocked from this client
-            for i, t in enumerate(self.blocked_ips.items()):
-                blocker = t[1]
-                if blocker == node_to_remove.content:
+            for i, t in self.blocked_ips.items():
+                blocker = t
+                if blocker.content == node_to_remove.content:
                     index_list.append(i)
             for index in index_list:
                 del(self.blocked_ips[index])
@@ -271,7 +272,7 @@ class DDosChain(Blockchain):
         Returns:
             Processor (function) that processes blockchain messages.
         """
-        
+
         msg_type, msg_data, msg_address = message
         if msg_type == 'get_ips':
             if msg_address == 'local':
