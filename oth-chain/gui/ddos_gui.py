@@ -33,7 +33,7 @@ def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keys
             keystore: Keystore object, obtained from core
     """
     app = QApplication(sys.argv)
-    ex = DDOSChainGUI(keystore)
+    ex = DDOSChainGUI(None)
     ex.initUI(chain_queue, gui_queue, command_queue)
 
     sys.exit(app.exec_())
@@ -90,12 +90,10 @@ class TabWidget(QWidget):
         self.tabs = QTabWidget()
         self.chain_tab = ChainHistoryWidget(self)
         self.peers_tab = GUI.PeerWidget(self)
-        self.keystore_tab = GUI.KeystoreWidget(self)
         self.client_tab = ClientWidget(self)
 
         self.tabs.addTab(self.chain_tab, 'Chain history')
         self.tabs.addTab(self.peers_tab, 'Peers')
-        self.tabs.addTab(self.keystore_tab, 'Keystore')
         self.tabs.addTab(self.client_tab, 'Auctions')
 
         self.layout.addWidget(self.tabs)
@@ -195,16 +193,74 @@ class ClientWidget(QWidget):
 class TransactionWidget(GUI.TransactionWidget):
 
     def __init__(self, parent: QWidget):
+        self.ip_edit = QLineEdit()
+        self.key_edit = QLineEdit()
+
+        self.block_radio = QRadioButton('Block IP')
+        self.unblock_radio = QRadioButton('Unblock IP')
+        self.invite_radio = QRadioButton('Invite User')
+        self.uninvite_radio = QRadioButton('Uninvite User')
+        self.purge_radio = QRadioButton('Purge User')
+
+        self.current_operation = 'b'
+
         super(TransactionWidget, self).__init__(parent)
 
     def prepare_transaction_form(self):
-        pass
+        radio_hbox = QHBoxLayout()
+
+        self.block_radio.toggled.connect(lambda: self.change_operation(self.block_radio))
+        self.unblock_radio.toggled.connect(lambda: self.change_operation(self.unblock_radio))
+        self.invite_radio.toggled.connect(lambda: self.change_operation(self.invite_radio))
+        self.uninvite_radio.toggled.connect(lambda: self.change_operation(self.uninvite_radio))
+        self.purge_radio.toggled.connect(lambda: self.change_operation(self.purge_radio))
+
+        radio_hbox.addWidget(self.block_radio)
+        radio_hbox.addWidget(self.unblock_radio)
+        radio_hbox.addWidget(self.invite_radio)
+        radio_hbox.addWidget(self.uninvite_radio)
+        radio_hbox.addWidget(self.purge_radio)
+
+        self.transaction_group_box_form.addRow(radio_hbox)
+
+        edit_hbox = QHBoxLayout()
+
+        self.ip_edit.setPlaceholderText('IP')
+        self.key_edit.setPlaceholderText('Public Key')
+
+        edit_hbox.addWidget(self.ip_edit)
+        edit_hbox.addWidget(self.key_edit)
+
+        self.transaction_group_box_form.addRow(edit_hbox)
+
+        self.transaction_group_box_form.addRow(self.send_button)
+
+        self.transaction_group_box_form.addRow(self.error_label)
+
+        self.transaction_group_box_layout.addLayout(self.transaction_group_box_form)
+        self.transaction_group_box.setLayout(self.transaction_group_box_layout)
+        self.layout.addWidget(self.transaction_group_box)
 
     def send_transaction(self):
         pass
 
     def change_operation(self, button: QRadioButton):
-        pass
-
-
-
+        if not button.isChecked():
+            return
+        self.ip_edit.setEnabled(False)
+        self.key_edit.setEnabled(False)
+        if button.text().startswith('Bl'):
+            self.ip_edit.setEnabled(True)
+            self.current_operation = 'b'
+        elif button.text().startswith('Unb'):
+            self.ip_edit.setEnabled(True)
+            self.current_operation = 'ub'
+        elif button.text().startswith('In'):
+            self.key_edit.setEnabled(True)
+            self.current_operation = 'i'
+        elif button.text().startswith('Uni'):
+            self.key_edit.setEnabled(True)
+            self.current_operation = 'ui'
+        elif button.text().startswith('P'):
+            self.key_edit.setEnabled(True)
+            self.current_operation = 'p'

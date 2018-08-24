@@ -12,6 +12,7 @@ import nacl.utils
 import core
 from chains import DDosChain, DDosTransaction, DDosData
 from utils import keystore, set_debug
+from gui import ddos_gui_loop
 
 
 def parse_args(argv):
@@ -89,10 +90,15 @@ def init(port: int, signing_key):
         print('No key was detected, generating private key')
         signing_key = nacl.signing.SigningKey.generate()
 
+    gui_thread = threading.Thread(
+        target=ddos_gui_loop,
+        args=(core.gui_send_queue, core.receive_queue, core.gui_receive_queue, None)
+    )
+
     verify_key = signing_key.verify_key
     verify_key_hex = verify_key.encode(nacl.encoding.HexEncoder)
 
-    return signing_key, verify_key_hex, networker, blockchain_thread
+    return signing_key, verify_key_hex, networker, blockchain_thread, gui_thread
 
 
 def create_transaction(sender: str,
@@ -124,7 +130,7 @@ def main(argv):
         argv: Arguments from the command line.
     """
 
-    signing_key, verify_key_hex, networker, blockchain_thread = init(
+    signing_key, verify_key_hex, networker, blockchain_thread, gui_thread = init(
         *parse_args(argv))
 
     # User Interaction
@@ -241,6 +247,9 @@ def main(argv):
                                     '',
                                     'local'
                                     ))
+        elif command == 'gui':
+            gui_thread.start()
+            core.gui_send_queue.put(('signing_key', signing_key, 'local'))
 
 
 if __name__ == "__main__":
