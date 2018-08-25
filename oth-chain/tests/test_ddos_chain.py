@@ -1,5 +1,8 @@
+""" Testing module for the DDoS implementation
+of the blockchain client.
+"""
+
 import hashlib
-import time
 import time
 from queue import Queue
 
@@ -13,7 +16,13 @@ VERSION = 0.7
 
 
 class TestDDos(object):
+    """ Testcase used to bundle all tests for the
+    DDoS blockchain
+    """
+
     def setup(self):
+        """ Setup of the blockchain for the tests.
+        """
         self.counter = 0
 
         self.sends = Queue()
@@ -34,6 +43,9 @@ class TestDDos(object):
             nacl.encoding.HexEncoder)
 
     def test_ip_blocking(self, capsys):
+        """ Test that blocking and unblocking of IPs works.
+        """
+        # Initial IPs
 
         ips = ['1.1.1.1',
                '2.2.2.2',
@@ -41,6 +53,9 @@ class TestDDos(object):
                '4.4.4.4',
                '5.5.5.5'
                ]
+
+        # Block IPs
+
         for ip in ips:
             self.process_transaction(
                 capsys, ip, 'b', self.sender_sign, self.sender_verify)
@@ -49,10 +64,14 @@ class TestDDos(object):
         captured = capsys.readouterr()
         assert captured.out == f'{ips}\n'
 
+        # Unblock the last 3 IPs
+
         for _ in range(3):
             ip = ips.pop()
             self.process_transaction(
                 capsys, ip, 'ub', self.sender_sign, self.sender_verify)
+
+        # Add 2 new IPs
 
         for ip in ['6.6.6.6', '7.7.7.7']:
             self.process_transaction(
@@ -64,11 +83,21 @@ class TestDDos(object):
         assert captured.out == f'{ips}\n'
 
     def test_invites(self, capsys):
+        """ Test that invites and uninvites of users works.
+        """
+
+        # Invite
+
         self.process_transaction(
             capsys, self.receiver_verify, 'i',
             self.sender_sign, self.sender_verify)
 
         def inner(ip):
+            """ Block IP
+
+            Args:
+                ip: IP that should be blocked
+            """
             self.fill_block(capsys, 4)
 
             self.process_transaction(
@@ -77,15 +106,21 @@ class TestDDos(object):
 
             self.fill_block(capsys, 4)
 
+        # Verify that new user can block IPs
+
         inner('1.1.1.1')
 
         self.chain.process_message(('get_ips', '', 'local'))
         captured = capsys.readouterr()
         assert '1.1.1.1' in captured.out
 
+        # Uninvite user
+
         self.process_transaction(
             capsys, self.receiver_verify, 'ui',
             self.sender_sign, self.sender_verify)
+
+        # Verify that uninvited user can no longer block IPs
 
         inner('2.2.2.2')
 
@@ -94,6 +129,8 @@ class TestDDos(object):
         assert '2.2.2.2' not in captured.out
 
     def test_children(self, capsys):
+        """ Test the user hierarchy
+        """
         self.process_transaction(
             capsys, self.receiver_verify, 'i',
             self.sender_sign, self.sender_verify)
@@ -108,12 +145,18 @@ class TestDDos(object):
         assert self.receiver_verify.decode('utf-8') in captured.out
 
     def test_purge(self, capsys):
+        """ Test the purging of a user-account
+        """
+
+        # Invite
 
         self.process_transaction(
             capsys, self.receiver_verify, 'i',
             self.sender_sign, self.sender_verify)
 
         self.fill_block(capsys, 4)
+
+        # Verify that new user can block IPs
 
         self.process_transaction(
             capsys, '3.3.3.3', 'b',
@@ -125,17 +168,25 @@ class TestDDos(object):
         captured = capsys.readouterr()
         assert '3.3.3.3' in captured.out
 
+        # Purge new user
+
         self.process_transaction(
             capsys, self.receiver_verify, 'p',
             self.sender_sign, self.sender_verify)
 
         self.fill_block(capsys, 4)
 
+        # Verify that IPs are now unblocked
+
         self.chain.process_message(('get_ips', '', 'local'))
         captured = capsys.readouterr()
         assert '3.3.3.3' not in captured.out
 
     def test_ancestors(self, capsys):
+        """ Test blocking/unblocking of IPs through ancestors
+        """
+
+        # Invite
 
         self.process_transaction(
             capsys, self.receiver_verify, 'i',
@@ -143,11 +194,15 @@ class TestDDos(object):
 
         self.fill_block(capsys, 4)
 
+        # New user blocks IP
+
         self.process_transaction(
             capsys, '1.2.3.4', 'b',
             self.receiver_sign, self.receiver_verify)
 
         self.fill_block(capsys, 4)
+
+        # Ancestor(initial user) takes over block
 
         self.process_transaction(
             capsys, '1.2.3.4', 'b',
@@ -155,9 +210,13 @@ class TestDDos(object):
 
         self.fill_block(capsys, 4)
 
+        # Verify IP is blocked
+
         self.chain.process_message(('get_ips', '', 'local'))
         captured = capsys.readouterr()
         assert '1.2.3.4' in captured.out
+
+        # Try unblocking with new user
 
         self.process_transaction(
             capsys, '1.2.3.4', 'ub',
@@ -165,22 +224,32 @@ class TestDDos(object):
 
         self.fill_block(capsys, 4)
 
+        # Verify that new user cannot unblock the IP of ancestor
+
         self.chain.process_message(('get_ips', '', 'local'))
         captured = capsys.readouterr()
         assert '1.2.3.4' in captured.out
+
+        # Unblock IP from ancestor (initial user)
 
         self.process_transaction(
             capsys, '1.2.3.4', 'ub',
             self.sender_sign, self.sender_verify)
 
         self.fill_block(capsys, 4)
+
+        # Verify that IP is now unblocked
 
         self.chain.process_message(('get_ips', '', 'local'))
         captured = capsys.readouterr()
         assert '1.2.3.4' not in captured.out
 
     def test_invalid_transaction(self, capsys):
+        """ Test that the chain rejects invalid transaction
+        """
         utils.set_debug()
+
+        # Verify rejection of duplicate transaction
 
         self.process_transaction(
             capsys, self.receiver_verify, 'i',
@@ -197,12 +266,16 @@ class TestDDos(object):
 
         self.fill_block(capsys, 4)
 
+        # Verify rejection of invite for members of the blockchain
+
         self.process_transaction(
             capsys, self.receiver_verify, 'i',
             self.sender_sign, self.sender_verify, False)
 
         captured = capsys.readouterr()
         assert 'Client is already invited!' in captured.out
+
+        # Verify rejection for uninvite of someone that is not a member
 
         self.process_transaction(
             capsys, 'Not a client', 'ui',
@@ -211,6 +284,8 @@ class TestDDos(object):
         captured = capsys.readouterr()
         assert 'Client could not be found!' in captured.out
 
+        # Verify rejection of not-permissioned uninvites
+
         self.process_transaction(
             capsys, self.sender_verify, 'ui',
             self.receiver_sign, self.receiver_verify, False)
@@ -218,12 +293,16 @@ class TestDDos(object):
         captured = capsys.readouterr()
         assert 'No permission to delete this node!' in captured.out
 
+        # Verify rejection of unblocking of not-blocked IPs
+
         self.process_transaction(
             capsys, '66.77.88.99', 'ub',
             self.receiver_sign, self.receiver_verify, False)
 
         captured = capsys.readouterr()
         assert 'Trying to unblock IP that was not blocked' in captured.out
+
+        # Verify rejection of blocking of already blocked IPs
 
         self.process_transaction(
             capsys, '255.255.255.0', 'b',
@@ -235,6 +314,22 @@ class TestDDos(object):
     # ####################### HELPER FUNCTIONS ###########################
 
     def fill_block(self, capsys, amount):
+        """ Fill block with additional transactions
+
+        This is needed because the DDoS-chain creates
+        a new block every 5 transactions.
+
+        The transactions are blocking-transactions of IPs with this format:
+        255.255.255.X
+        with X increasing over time and is never the same.
+        Uses self.counter for this.
+
+        This works only for up to 255 transactions,
+        if more are needed change the function.
+
+        Args:
+            amount: Number of transactions missing to 5
+        """
         for i in range(amount):
             self.process_transaction(
                 capsys,
@@ -252,6 +347,17 @@ class TestDDos(object):
                             s_sign,
                             s_ver,
                             disable_out=True):
+        """ Create + Process a transaction.
+
+        Args:
+            capsys: capsys of caller.
+            data: DDos data (e.g. IP, key)
+            action: DDos action (e.g. 'b', 'ui')
+            s_sign: Signing key of sender
+            s_ver: Verify key of sender
+            disabled_out: Disable output (default: True)
+        """
+
         timestamp = time.time()
 
         transaction = self.create_transaction(s_ver,
@@ -277,6 +383,17 @@ class TestDDos(object):
                            data: chains.DDosData,
                            signing_key: nacl.signing.SigningKey) \
             -> chains.DDosTransaction:
+        """ Create a transaction.
+
+        Args:
+            sender: Verify key of sender.
+            timestamp: Timestamp of transaction.
+            data: DDoS data (action, data)
+            signing_key: Signing key of sender
+
+        Returns:
+            Created transaction
+        """
         hash_str = (str(sender) +
                     str(data) +
                     str(timestamp))

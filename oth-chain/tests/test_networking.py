@@ -166,6 +166,10 @@ def test_split_messaging_3():
 
 
 def test_worker():
+    """ Test to see if the worker processes incoming tasks as planned.
+
+    Tests additionally if the closing of the worker(-thread) works.
+    """
     send_queue = Queue()
     cmd_queue = Queue()
     send_queue.put(None)
