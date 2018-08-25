@@ -25,7 +25,10 @@ class PoW_Blockchain(Blockchain):
         gui_queue: Queue for interaction with the gui.
     """
 
-    def validate_block(self, block: Block, last_block: Block) -> bool:
+    def validate_block(self,
+                       block: Block,
+                       last_block: Block,
+                       new_chain: bool) -> bool:
         """ Validates a provided block.
 
         Takes the previous block in the chain into account
@@ -36,11 +39,12 @@ class PoW_Blockchain(Blockchain):
             block: The block to be validated.
             last_block: The last block of the chain,
                 upon which validation of the hash is based.
+            new_chain: Validate transaction for new chain?
 
         Returns:
             The validity (True/False) of the block
         """
-        if not super().validate_block(block, last_block):
+        if not super().validate_block(block, last_block, new_chain):
             return False
 
         # check if the proof of the new block is valid
@@ -66,12 +70,14 @@ class PoW_Blockchain(Blockchain):
 
                 if not mining_reward + fee_sum == transaction.amount:
                     return False
-            elif not self.validate_transaction(transaction, mining=True):
+            elif not self.validate_transaction(transaction,
+                                               new_chain, mining=True):
                 return False
         return True
 
     def validate_transaction(self,
                              transaction: Transaction,
+                             new_chain: bool,
                              mining: bool = False) -> bool:
         """ Validates a single transaction.
 
@@ -80,6 +86,7 @@ class PoW_Blockchain(Blockchain):
 
         Args:
             transaction: The transaction to be validated.
+            new_chain: Validate transaction for new chain?
             mining: If False, the function invalidates transaction,
                         that are already in the transaction pool.
                     If True, the function checks all transactions in the block

@@ -51,10 +51,12 @@ class DNSBlockChain(PoW_Blockchain):
                  gui_queue: Queue) -> None:
         super(DNSBlockChain, self).__init__(version, send_queue, gui_queue)
         self.chain: OrderedDict[Header, List[DNS_Transaction]] = OrderedDict()
-        self.new_chain: OrderedDict[Header, List[DNS_Transaction]] = OrderedDict()
+        self.new_chain: OrderedDict[Header,
+                                    List[DNS_Transaction]] = OrderedDict()
         self.transaction_pool: List[DNS_Transaction] = []
         self.load_chain()  # overwrite?
-        self.auctions: OrderedDict[int, List[Tuple[DNS_Transaction, DNS_Transaction]]] = OrderedDict()
+        self.auctions: OrderedDict[int,
+                                   List[Tuple[DNS_Transaction, DNS_Transaction]]] = OrderedDict()
 
     def check_auction(self, transaction: DNS_Transaction):
         if transaction.recipient == '0' and transaction.data.type == 't':
@@ -62,7 +64,9 @@ class DNSBlockChain(PoW_Blockchain):
         if transaction.recipient == '0' and transaction.data.type == 'b':
             self._bid(transaction)
 
-    def validate_transaction(self, transaction: DNS_Transaction, mining: bool = False) -> bool:
+    def validate_transaction(self, transaction: DNS_Transaction,
+                             new_chain: bool,
+                             mining: bool = False) -> bool:
         """ Validates a given transaction.
             Overwrites validate_transaction from pow_chain.py.
             Checks if a transaction is
@@ -83,7 +87,8 @@ class DNSBlockChain(PoW_Blockchain):
             if transaction.amount == 0:
                 return False
         if not normal_transaction:
-            valid_domain_operation = self._is_valid_domain_transaction(transaction)
+            valid_domain_operation = self._is_valid_domain_transaction(
+                transaction, new_chain)
             if not valid_domain_operation:
                 return False
 
@@ -133,7 +138,7 @@ class DNSBlockChain(PoW_Blockchain):
 
         msg_type, msg_data, msg_address = message
         if msg_type == 'dns_lookup':
-            ip = self._resolve_domain_name(msg_data)
+            ip = self._resolve_domain_name(msg_data, time.time())
             if not ip[0]:
                 result = f'Domain name {msg_data} could not be found.'
             elif ip[0] == 'N/A':
@@ -147,7 +152,8 @@ class DNSBlockChain(PoW_Blockchain):
             if msg_address == 'gui':
                 for key, auction_list in self.auctions.items():
                     for auction in auction_list:
-                        self.gui_queue.put(('auction', (auction, str(key)), 'local'))
+                        self.gui_queue.put(
+                            ('auction', (auction, str(key)), 'local'))
             else:
                 print(self.auctions)
         elif msg_type == 'owned_domains':
@@ -197,15 +203,30 @@ class DNSBlockChain(PoW_Blockchain):
 
         self.new_block(self.prepare_new_block(block))
 
-    def _resolve_domain_name(self, name: str) -> Tuple[Any, Any]:
-        """ Resolves a given domain name to its' corresponding ip_address as well as its' owner.
-            Returns an empty string for the ip if the domain_name is not yet registered,
-            or was recently transferred to another owner.
+    def _resolve_domain_name(self,
+                             name: str,
+                             timestamp: int,
+                             new_chain: bool = False) -> Tuple[Any, Any]:
+        """ Resolves a given domain name to its' corresponding ip_address as
+            well as its' owner.
+
+        Returns an empty string for the ip if the domain_name is not yet
+            registered, or was recently transferred to another owner.
+
             Args:
                 name: The domain_name
+                timestamp: Timestamp to stop at
+                new_chain: Validate transaction for new chain (default= False)
         """
-        for block_transaction in list(self.chain.values())[::-1]:
+        if new_chain:
+            chain = list(self.new_chain.values())
+        else:
+            chain = list(self.chain.values())
+
+        for block_transaction in chain[::-1]:
             for transaction in block_transaction[::-1]:
+                if transaction.timestamp > timestamp:
+                    break
                 if transaction.data.domain_name == name:
                     if transaction.data.type == 't':
                         return 'N/A', transaction.recipient
@@ -213,22 +234,33 @@ class DNSBlockChain(PoW_Blockchain):
 
         return '', ''
 
-    def _is_valid_domain_transaction(self, transaction: DNS_Transaction) -> bool:
-        """ Checks if a transaction is valid to perform considering already registered domain names
+    def _is_valid_domain_transaction(self,
+                                     transaction: DNS_Transaction,
+                                     new_chain: bool) -> bool:
+        """ Checks if a transaction is valid to perform considering already
+            registered domain names
+
             Args:
                 transaction: The transaction to be validated
+                new_chain: Validate transaction for new chain
         """
         if transaction.data.type == 'b':
             for auction_list in self.auctions.values():
                 for auction in auction_list:
-                    if auction[0].data.domain_name == transaction.data.domain_name:
+                    if auction[0].data.domain_name ==\
+                            transaction.data.domain_name:
                         if transaction.amount > auction[1].amount:
                             return True
                         if transaction == auction[1]:
                             return True
                         return False
             return False
-        ip, owner = self._resolve_domain_name(transaction.data.domain_name)
+
+        ip, owner = self._resolve_domain_name(
+            transaction.data.domain_name,
+            transaction.timestamp,
+            new_chain)
+
         if transaction.data.type == 'r' and ip:
             return False
         elif transaction.data.type in 'ut':
@@ -254,9 +286,11 @@ class DNSBlockChain(PoW_Blockchain):
         except KeyError:
             self.auctions[i + MAX_AUCTION_TIME] = []
         auction = (transaction, bid_transaction)
-        self.auctions[i + MAX_AUCTION_TIME].append((transaction, bid_transaction))
+        self.auctions[i +
+                      MAX_AUCTION_TIME].append((transaction, bid_transaction))
         if self.gui_ready:
-            self.gui_queue.put(('auction', (auction, str(i + MAX_AUCTION_TIME)), 'local'))
+            self.gui_queue.put(
+                ('auction', (auction, str(i + MAX_AUCTION_TIME)), 'local'))
 
     def _resolve_auction(self, auction: Tuple[DNS_Transaction, DNS_Transaction]):
         """ Resolves an auction given through a  tuple of transactions by creating
@@ -275,7 +309,8 @@ class DNSBlockChain(PoW_Blockchain):
         t_fee = 1
         t_timestamp = time.time()
         t_data = DNS_Data('t', domain, '')
-        transfer_transaction = DNS_Transaction(t_sender, t_recipient, t_amount, t_fee, t_timestamp, t_data, '1')
+        transfer_transaction = DNS_Transaction(
+            t_sender, t_recipient, t_amount, t_fee, t_timestamp, t_data, '1')
 
         p_sender = '0'
         p_recipient = t1.sender
@@ -283,7 +318,8 @@ class DNSBlockChain(PoW_Blockchain):
         p_fee = 1
         p_timestamp = time.time()
         p_data = DNS_Data('', '', '')
-        payment_transaction = DNS_Transaction(p_sender, p_recipient, p_amount, p_fee, p_timestamp, p_data, '1')
+        payment_transaction = DNS_Transaction(
+            p_sender, p_recipient, p_amount, p_fee, p_timestamp, p_data, '1')
         if self.gui_ready:
             self.gui_queue.put(('auction_expired', t1, 'local'))
 

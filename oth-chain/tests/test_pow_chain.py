@@ -79,7 +79,7 @@ class TestPOW(object):
         """
         transaction = self.create_transaction()
 
-        assert not self.blockchain.validate_transaction(transaction)
+        assert not self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 
@@ -108,7 +108,7 @@ class TestPOW(object):
             )
         )
 
-        assert not self.blockchain.validate_transaction(transaction)
+        assert not self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 
@@ -122,14 +122,14 @@ class TestPOW(object):
 
         transaction = self.create_transaction()
 
-        assert self.blockchain.validate_transaction(transaction)
+        assert self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 
         assert transaction in self.blockchain.transaction_pool
         assert not self.sends.empty()
 
-        assert not self.blockchain.validate_transaction(transaction)
+        assert not self.blockchain.validate_transaction(transaction, False)
 
     def test_transaction_valid(self):
         """ Test that a valid transaction is recognized and added to the
@@ -139,7 +139,7 @@ class TestPOW(object):
 
         transaction = self.create_transaction()
 
-        assert self.blockchain.validate_transaction(transaction)
+        assert self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 

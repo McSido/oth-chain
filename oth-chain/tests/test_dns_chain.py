@@ -120,7 +120,7 @@ class TestDNS(object):
                                         20
                                         )
 
-            assert not self.chain.validate_transaction(t)
+            assert not self.chain.validate_transaction(t, False)
 
             # Verify that new user can change entry
 
@@ -136,7 +136,7 @@ class TestDNS(object):
                                         20,
                                         )
 
-            assert self.chain.validate_transaction(t)
+            assert self.chain.validate_transaction(t, False)
 
     def test_auction(self, capsys):
         """ Test the auction system of the dns chain
@@ -201,7 +201,7 @@ class TestDNS(object):
                                         20,
                                         )
 
-            assert self.chain.validate_transaction(t)
+            assert self.chain.validate_transaction(t, False)
 
     def test_resolve_conflict(self):
         """ Test that resolve conflict works with the dns chain
