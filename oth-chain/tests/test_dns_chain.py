@@ -14,7 +14,7 @@ import chains
 VERSION = 0.7
 
 
-class TestDDos(object):
+class TestDNS(object):
     """ Testcase used to bundle all tests for the
     DNS blockchain
     """
