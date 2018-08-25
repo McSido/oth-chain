@@ -48,7 +48,8 @@ class Node(object):
         if self.content == item:
             return True
         for child in self.children:
-            return item in child
+            if item in child:
+                return True
         return False
 
     def get_node_by_content(self, content: str) -> Optional['Node']:
@@ -60,7 +61,9 @@ class Node(object):
         if self.content == content:
             return self
         for child in self.children:
-            return child.get_node_by_content(content)
+            result = child.get_node_by_content(content)
+            if result:
+                return result
         return None
 
     def remove_node(self, node: 'Node', cascading: bool):

@@ -117,6 +117,8 @@ class DDosChain(Blockchain):
                     index_list.append(i)
             for index in index_list:
                 del(self.blocked_ips[index])
+        if self.gui_ready:
+            self.gui_queue.put(('operation', transaction, 'local'))
 
     def valid_operation(self, transaction: DDosTransaction):
         # Invite
@@ -177,6 +179,8 @@ class DDosChain(Blockchain):
 
         self.transaction_pool.append(transaction)
         self.send_queue.put(('new_transaction', transaction, 'broadcast'))
+        if self.gui_ready:
+            self.gui_queue.put(('new_transaction', transaction, 'local'))
         if len(self.transaction_pool) >= 5:
             self.create_m_blocks()
 
@@ -195,6 +199,8 @@ class DDosChain(Blockchain):
             self.process_block(block)
             self.chain[block.header] = block.transactions
             self.send_queue.put(('new_block', block, 'broadcast'))
+            if self.gui_ready:
+                self.gui_queue.put(('new_block', block, 'local'))
         else:
             print_debug_info('Block not for main chain')
 
@@ -282,9 +288,11 @@ class DDosChain(Blockchain):
             else:
                 return
         elif msg_type == 'show_children':
-            if not msg_address == 'local':
-                return
             node = self.tree.get_node_by_content(str(msg_data))
-            node.print()
+            if msg_address == 'local':
+                node.print()
+            elif msg_address == 'gui':
+                self.gui_queue.put(('tree', node, 'local'))
+
         else:
             super(DDosChain, self).process_message(message)

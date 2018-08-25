@@ -4,6 +4,7 @@ import threading
 import time
 
 import math
+from typing import Tuple, Any
 
 import nacl.encoding
 import nacl.signing
@@ -11,6 +12,7 @@ import nacl.utils
 
 from utils import Keystore, load_key, save_key
 from chains import Block, Transaction
+from networking import Address
 
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QWidget, QVBoxLayout, QTabWidget, QTreeWidget, \
@@ -45,8 +47,6 @@ class ChainGUI(QMainWindow):
 
     def __init__(self, keystore: Keystore):
         super(ChainGUI, self).__init__()
-        self.lineEditHistory = list()
-        self.lineHistoryCounter = len(self.lineEditHistory)
         self.keystore = keystore
 
     def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
@@ -79,25 +79,29 @@ class ChainGUI(QMainWindow):
             Receives messages and calls the appropriate functions.
         """
         while True:
-            msg_type, msg_data, msg_address = self.gui_queue.get(block=True)
-            if msg_type == 'new_block':
-                self.splitter.widget(0).chain_tab.new_block(msg_data)
-                self.splitter.widget(1).request_balance()
-            elif msg_type == 'new_transaction':
-                self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
-            elif msg_type == 'dump':
-                self.splitter.widget(0).chain_tab.load_data(msg_data)
-                self.splitter.widget(1).request_balance()
-            elif msg_type == 'active_peer':
-                self.splitter.widget(0).peers_tab.update_peers('active', msg_data)
-            elif msg_type == 'inferred_peer':
-                self.splitter.widget(0).peers_tab.update_peers('inferred', msg_data)
-            elif msg_type == 'inactive_peer':
-                self.splitter.widget(0).peers_tab.update_peers('inactive', msg_data)
-            elif msg_type == 'signing_key':
-                self.splitter.widget(1).update_signing_key(msg_data)
-            elif msg_type == 'balance':
-                self.splitter.widget(1).update_balance(msg_data)
+            self.handle_message(*self.gui_queue.get(block=True))
+
+    def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
+        """ Gets a message and responds to it accordingly
+        """
+        if msg_type == 'new_block':
+            self.splitter.widget(0).chain_tab.new_block(msg_data)
+            self.splitter.widget(1).request_balance()
+        elif msg_type == 'new_transaction':
+            self.splitter.widget(0).chain_tab.add_transaction_pool_item(msg_data)
+        elif msg_type == 'dump':
+            self.splitter.widget(0).chain_tab.load_data(msg_data)
+            self.splitter.widget(1).request_balance()
+        elif msg_type == 'active_peer':
+            self.splitter.widget(0).peers_tab.update_peers('active', msg_data)
+        elif msg_type == 'inferred_peer':
+            self.splitter.widget(0).peers_tab.update_peers('inferred', msg_data)
+        elif msg_type == 'inactive_peer':
+            self.splitter.widget(0).peers_tab.update_peers('inactive', msg_data)
+        elif msg_type == 'signing_key':
+            self.splitter.widget(1).update_signing_key(msg_data)
+        elif msg_type == 'balance':
+            self.splitter.widget(1).update_balance(msg_data)
 
     def closeEvent(self, a0: QtGui.QCloseEvent):
         """ Event that gets called on hitting the close-button of the GUI.
@@ -215,7 +219,8 @@ class ChainHistoryWidget(QWidget):
         item = self.create_transaction_item(transaction, self.transaction_pool_item.childCount())
         self.transaction_pool_item.insertChild(0, item)
 
-    def create_transaction_item(self, transaction: Transaction, number: int) -> QTreeWidgetItem:
+    @classmethod
+    def create_transaction_item(cls, transaction: Transaction, number: int) -> QTreeWidgetItem:
         """ Takes a transaction object and builds an item for the tree widget from it.
             Args:
                 transaction: the transaction object.
@@ -265,11 +270,14 @@ class ChainHistoryWidget(QWidget):
             timestamp = time.strftime("%d.%m.%Y %H:%M:%S %Z",
                                       time.gmtime(transaction.timestamp))
             for i in range(self.transaction_pool_item.childCount()):
-                if self.transaction_pool_item.child(i).child(4).text(1) == timestamp:
+                if self.get_timestamp_from_child(self.transaction_pool_item.child(i)) == timestamp:
                     items_to_delete.append(self.transaction_pool_item.child(i))
 
         for item in items_to_delete:
             self.transaction_pool_item.removeChild(item)
+
+    def get_timestamp_from_child(self, child: QTreeWidgetItem):
+        return child.child(4).text(1)
 
 
 class PeerWidget(QWidget):
@@ -472,13 +480,37 @@ class TransactionWidget(QWidget):
         self.user_group_box_form = QFormLayout()
 
         self.load_key_button = QPushButton('Load private Key')
-        self.load_key_button.clicked.connect(self.load_signing_key)
         self.export_key_button = QPushButton('Export public Key')
-        key_hbox = QHBoxLayout()
+        self.save_key_button = QPushButton('Save private Key')
         self.user_field = QLineEdit()
+        self.mine_button = QPushButton('Start Mining')
+
+        self.transaction_group_box = QGroupBox()
+
+        self.transaction_group_box_layout = QVBoxLayout()
+        self.transaction_group_box_form = QFormLayout()
+
+        self.balance_label = QLabel('Current Balance: 0')
+        self.recipient_edit = QLineEdit()
+        self.amount_edit = QSpinBox()
+        self.send_button = QPushButton('Send')
+
+        self.fee_label = QLabel('Fee: 1')
+        self.error_label = QLabel()
+
+        self.setLayout(self.layout)
+
+        self.prepare_user_form()
+        self.prepare_transaction_form()
+
+    def prepare_user_form(self):
+        """ Prepares the user form of this widget
+        """
+        self.load_key_button.clicked.connect(self.load_signing_key)
+        key_hbox = QHBoxLayout()
         self.user_field.setEnabled(False)
         self.user_field.setPlaceholderText('Key')
-        self.save_key_button = QPushButton('Save private Key')
+
         key_hbox.addWidget(self.save_key_button)
         key_hbox.addWidget(self.load_key_button)
         key_hbox.addWidget(self.export_key_button)
@@ -486,10 +518,9 @@ class TransactionWidget(QWidget):
         self.save_key_button.clicked.connect(self.save_signing_key)
         self.export_key_button.clicked.connect(self.export_verify_key)
 
-        self.user_group_box_form.addRow(QLabel('User:'), self.user_field)
+        self.user_group_box_form.addRow(QLabel('User (Public key):'), self.user_field)
         self.user_group_box_form.addRow(key_hbox)
 
-        self.mine_button = QPushButton('Start Mining')
         self.mine_button.clicked.connect(self.mine)
         self.user_group_box_form.addRow(self.mine_button)
 
@@ -497,23 +528,17 @@ class TransactionWidget(QWidget):
         self.user_group_box.setLayout(self.user_group_box_layout)
         self.layout.addWidget(self.user_group_box)
 
-        self.transaction_group_box = QGroupBox()
-
-        self.transaction_group_box_layout = QVBoxLayout()
-        self.transaction_group_box_form = QFormLayout()
-
+    def prepare_transaction_form(self):
+        """ Prepares the transaction form of this widget
+        """
         self.transaction_group_box_form.addRow(QLabel('New Transaction:'))
-        self.balance_label = QLabel('Current Balance: 0')
         self.transaction_group_box_form.addRow(self.balance_label)
-        self.recipient_edit = QLineEdit()
+
         self.recipient_edit.setPlaceholderText('Recipient')
-        self.amount_edit = QSpinBox()
         self.amount_edit.valueChanged.connect(self.update_fee)
 
-        self.send_button = QPushButton('Send')
         self.send_button.clicked.connect(self.send_transaction)
 
-        self.fee_label = QLabel('Fee: 1')
         transaction_hbox = QHBoxLayout()
         transaction_hbox.addWidget(self.amount_edit)
         transaction_hbox.addWidget(self.fee_label)
@@ -529,11 +554,8 @@ class TransactionWidget(QWidget):
         self.transaction_group_box.setLayout(self.transaction_group_box_layout)
         self.layout.addWidget(self.transaction_group_box)
 
-        self.error_label = QLabel()
         self.error_label.hide()
         self.transaction_group_box_form.addRow(self.error_label)
-
-        self.setLayout(self.layout)
 
     def mine(self):
         """ Send a mine message to the blockchain
@@ -555,31 +577,37 @@ class TransactionWidget(QWidget):
             self.error_label.setText('Error: Recipient name could not be found in the keystore!')
             self.error_label.show()
             return
-        timestamp = time.time()
-        # fee equals 5% of the transaction amount - at least 1
         amount = self.amount_edit.value()
         fee = math.ceil(amount * 0.05)
+
         if amount + fee > int(self.balance_label.text().split(': ')[1]):
             self.error_label.setText('Error: Current balance is not sufficient for this transaction!')
             self.error_label.show()
             return
+
+        transaction = self.prepare_transaction(recipient, amount, fee, time.time())
+
+        self.chain_queue.put(('new_transaction',
+                              transaction,
+                              'gui'
+                              ))
+
+    def prepare_transaction(self, recipient, amount, fee, timestamp):
         transaction_hash = hashlib. \
             sha256((str(self.verify_key_hex) +
                     str(recipient) + str(amount)
                     + str(fee) +
                     str(timestamp)).encode()).hexdigest()
 
-        self.chain_queue.put(('new_transaction',
-                              Transaction(self.verify_key_hex,
-                                          recipient,
-                                          amount,
-                                          fee,
-                                          timestamp,
-                                          self.signing_key.sign(
-                                              transaction_hash.encode())
-                                          ),
-                              'gui'
-                              ))
+        transaction = Transaction(self.verify_key_hex,
+                                  recipient,
+                                  amount,
+                                  fee,
+                                  timestamp,
+                                  self.signing_key.sign(
+                                      transaction_hash.encode())
+                                  )
+        return transaction
 
     def load_signing_key(self):
         """ Loads a private key, to change the current user.

@@ -127,6 +127,8 @@ class TestDNS(object):
             self.sender_verify = self.receiver_verify
             self.sender_sign = self.receiver_sign
 
+            self.chain.process_message(('mine', self.sender_verify, 'local'))
+
             t = self.create_transaction(chains.DNS_Data('u',
                                                         'seclab.oth',
                                                         '127.0.0.3'),
