@@ -250,6 +250,7 @@ def main(argv):
         elif command == 'gui':
             gui_thread.start()
             core.gui_send_queue.put(('signing_key', signing_key, 'local'))
+            core.receive_queue.put(('show_children', str(verify_key_hex), 'gui'))
 
 
 if __name__ == "__main__":
