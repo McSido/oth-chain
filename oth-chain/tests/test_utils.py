@@ -2,6 +2,8 @@ import utils
 
 
 def test_debug_info(capsys):
+    """ Test printing of debug info
+    """
     utils.set_debug()
     utils.print_debug_info('TEST')
 
@@ -10,6 +12,8 @@ def test_debug_info(capsys):
 
 
 def test_key(tmpdir):
+    """ Test loading and saving of a key.
+    """
     key = 'ABC'
 
     path = tmpdir.mkdir('key').join('key1')
@@ -20,6 +24,8 @@ def test_key(tmpdir):
 
 
 def test_keystore(tmpdir):
+    """ Test functionality of the keystore
+    """
 
     key = 'ABC'
 
@@ -30,6 +36,7 @@ def test_keystore(tmpdir):
     store = utils.Keystore(store_path)
 
     assert store.add_key('TEST', key_path)[1]
+
     store.update_key('TEST', key_path)
 
     assert store.resolve_name('TEST') == key

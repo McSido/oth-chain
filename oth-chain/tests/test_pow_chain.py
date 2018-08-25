@@ -79,7 +79,7 @@ class TestPOW(object):
         """
         transaction = self.create_transaction()
 
-        assert not self.blockchain.validate_transaction(transaction)
+        assert not self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 
@@ -108,7 +108,7 @@ class TestPOW(object):
             )
         )
 
-        assert not self.blockchain.validate_transaction(transaction)
+        assert not self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 
@@ -122,14 +122,14 @@ class TestPOW(object):
 
         transaction = self.create_transaction()
 
-        assert self.blockchain.validate_transaction(transaction)
+        assert self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 
         assert transaction in self.blockchain.transaction_pool
         assert not self.sends.empty()
 
-        assert not self.blockchain.validate_transaction(transaction)
+        assert not self.blockchain.validate_transaction(transaction, False)
 
     def test_transaction_valid(self):
         """ Test that a valid transaction is recognized and added to the
@@ -139,7 +139,7 @@ class TestPOW(object):
 
         transaction = self.create_transaction()
 
-        assert self.blockchain.validate_transaction(transaction)
+        assert self.blockchain.validate_transaction(transaction, False)
 
         self.blockchain.new_transaction(transaction)
 
@@ -147,6 +147,8 @@ class TestPOW(object):
         assert not self.sends.empty()
 
     def test_new_header(self, capsys):
+        """ Test that a new incoming header is processed accordingly.
+        """
 
         with capsys.disabled():
             proof = self.blockchain.create_proof(self.sender_verify)
@@ -201,13 +203,21 @@ class TestPOW(object):
         assert self.sends.get() == ('get_chain', '', 'broadcast')
 
     def test_get_block(self):
+        """ Test that get_block works.
+
+        Uses latest_block for comparison.
+        """
         b = self.blockchain.latest_block()
 
         assert b == self.blockchain.get_block(b.header)
 
+        # Invalid header -> return None
+
         assert not self.blockchain.get_block('')
 
     def test_send_block(self):
+        """ Test that send_block works.
+        """
         self.mine_block(self.blockchain)
         b = self.blockchain.latest_block()
 
@@ -216,12 +226,19 @@ class TestPOW(object):
         assert self.sends.get() == ('new_block', b, '123')
 
     def test_merkle_root(self):
+        """ Test that Merkle root is independent of transaction order.
+
+        Only factor for the Merkle root should be timestamp of the transaction.
+        """
         t = [self.create_transaction() for i in range(15)]
 
         assert self.blockchain.create_merkle_root(t) == \
             self.blockchain.create_merkle_root(list(reversed(t)))
 
     def test_msg_transaction(self):
+        """ Test that the process message can process new transactions
+        """
+
         self.mine_block(self.blockchain)
 
         t = self.create_transaction()
@@ -230,6 +247,11 @@ class TestPOW(object):
         assert t in self.blockchain.transaction_pool
 
     def test_resolve_conflict(self):
+        """ Test that resolve conflict works
+        """
+
+        # Initial chain
+
         self.mine_block(self.blockchain)
 
         t = self.create_transaction()
@@ -237,10 +259,14 @@ class TestPOW(object):
         self.blockchain.new_transaction(t)
         self.mine_block(self.blockchain)
 
+        # Secondary chain
+
         bchain2 = PoW_Blockchain(VERSION,
                                  Queue(),
                                  Queue()
                                  )
+
+        # Fill secondary chain
 
         for _ in range(3):
             self.mine_block(bchain2)
@@ -248,9 +274,13 @@ class TestPOW(object):
         bchain2.new_transaction(t)
         bchain2.process_message(('mine', self.sender_verify, 'local'))
 
+        # Check new_chain of the initial blockchain
+
         self.blockchain.resolve_conflict(bchain2.get_header_chain())
 
         assert bchain2.latest_header() == self.blockchain.nc_latest_header()
+
+        # Add to secondary chain, to test "pre-filling" of new_chain
 
         for _ in range(3):
             self.mine_block(bchain2)
@@ -268,6 +298,9 @@ class TestPOW(object):
 
     def mine_block(self, chain):
         """ Mine an initial block to add a balance to the test account.
+
+        Args:
+            chain: Chain to mine on
         """
 
         proof = chain.create_proof(self.sender_verify)

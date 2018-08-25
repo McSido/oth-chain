@@ -123,7 +123,7 @@ class Blockchain(object):
                 return
         if transaction in self.latest_block().transactions:
             return
-        if self.validate_transaction(transaction):
+        if self.validate_transaction(transaction, False):
             self.transaction_pool.append(transaction)
             self.send_queue.put(('new_transaction', transaction, 'broadcast'))
             if self.gui_ready:
@@ -145,7 +145,7 @@ class Blockchain(object):
         # Check current chain
 
         if block.header.index == self.latest_block().header.index + 1:
-            if self.validate_block(block, self.latest_block()):
+            if self.validate_block(block, self.latest_block(), False):
                 # remove transactions in new block from own transaction pool
                 for block_transaction in block.transactions:
                     if block_transaction in self.transaction_pool:
@@ -181,7 +181,8 @@ class Blockchain(object):
                         if h == old_data[0]:
                             continue
                         if self.validate_block(
-                                Block(h, t), Block(old_data[0], old_data[1])):
+                                Block(h, t), Block(old_data[0], old_data[1]),
+                                True):
                             old_data = (h, t)
                         else:
                             print_debug_info(
@@ -256,15 +257,19 @@ class Blockchain(object):
 
         return True
 
-    def validate_block(self, block: Block, last_block: Block) -> bool:
+    def validate_block(self,
+                       block: Block,
+                       last_block: Block,
+                       new_chain: bool = False) -> bool:
         """ Validate a block.
 
         Does only validate basic things.
-        Override this function if needed
+        Override this function if needed.
 
         Args:
-            block: Block that should be validated
+            block: Block that should be validated.
             last_block: Current last block.
+            new_chain: Validate transaction for new chain?
 
         Returns:
             The validity (True/False) of the block
@@ -280,13 +285,16 @@ class Blockchain(object):
 
         return True
 
-    def validate_transaction(self, transaction: Transaction):
+    def validate_transaction(self,
+                             transaction: Transaction,
+                             new_chain: bool = False):
         """ Validate a transaction.
 
         Abstract function!
 
         Args:
             transaction: Transaction that should be validated
+            new_chain: Validate transaction for new chain?
         """
         raise NotImplementedError
 
