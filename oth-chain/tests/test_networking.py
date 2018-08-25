@@ -3,7 +3,11 @@
 
 from queue import Queue
 
-from networking import ExtendedUDP, SERVER, PEERS, unpack_msg, process_incoming_msg, pack_msg, send_msg
+import pytest
+
+import utils
+from networking import (PEERS, SERVER, Address, ExtendedUDP, pack_msg,
+                        process_incoming_msg, send_msg, unpack_msg, worker)
 
 SERVER.setup(6666)
 
@@ -31,21 +35,76 @@ def test_packing():
     assert data == unpack_msg(packed)
 
 
-def test_process_incoming():
+def test_process_incoming(capsys):
     """ Test to determine that messages expected to be given to the blockchain
     are added to the receive_queue.
     """
-    msg = ('to-blockchain', 'msg-data')
-    receive_queue = Queue()
-    address = ('0.0.0.0', 1)
+    with capsys.disabled():
+        msg = ('to-blockchain', 'msg-data')
+        receive_queue = Queue()
+        address = ('0.0.0.0', 1)
 
-    process_incoming_msg(
-        pack_msg(msg),
-        address,
-        receive_queue
-    )
+        process_incoming_msg(
+            pack_msg(msg),
+            address,
+            receive_queue
+        )
 
-    assert receive_queue.get() == (msg[0], msg[1], address)
+        assert receive_queue.get() == (msg[0], msg[1], address)
+
+        n_address = ('123.123.123.123', 1)
+
+        msg = ('N_new_peer', n_address)
+        process_incoming_msg(
+            pack_msg(msg),
+            address,
+            receive_queue
+        )
+
+        assert n_address in PEERS._peer_list
+
+        msg = ('N_pong', '')
+        process_incoming_msg(
+            pack_msg(msg),
+            n_address,
+            receive_queue
+        )
+
+        assert n_address in PEERS.get_active_peers()
+
+        msg = ('N_get_peers', '')
+        process_incoming_msg(
+            pack_msg(msg),
+            ('127.0.0.1', 6667),
+            receive_queue
+        )
+
+        for p in PEERS.get_all_peers():
+
+            received = RECEIVER.receive_msg()
+
+            assert p == unpack_msg(received[0])[1]
+
+        msg = ('N_ping', '')
+        process_incoming_msg(
+            pack_msg(msg),
+            ('127.0.0.1', 6667),
+            receive_queue
+        )
+
+        received = RECEIVER.receive_msg()
+
+        assert 'N_pong' == unpack_msg(received[0])[0]
+
+    utils.set_debug()
+
+    process_incoming_msg(pack_msg(''),
+                         address,
+                         receive_queue)
+
+    captured = capsys.readouterr()
+
+    assert captured.out.startswith('### DEBUG ### Received invalid message\n')
 
 
 def test_unsplit_messaging():
@@ -104,3 +163,17 @@ def test_split_messaging_3():
 
     # Check content
     assert unpack_msg(received[0]) == (msg[0], msg[1])
+
+
+def test_worker():
+    send_queue = Queue()
+    cmd_queue = Queue()
+    send_queue.put(None)
+    cmd_queue.put('print_peers')
+    with pytest.raises(SystemExit) as pytest_wrapped_e:
+        worker(send_queue,
+               Queue(),
+               cmd_queue,
+               Queue(),
+               6668)
+    assert pytest_wrapped_e.type == SystemExit

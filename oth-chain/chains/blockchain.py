@@ -188,6 +188,7 @@ class Blockchain(object):
                                 'Invalid transaction in new chain')
                             self.new_chain.clear()
                             self.intermediate_transactions.clear()
+                            return
 
                     self.send_queue.put(
                         ('new_header', self.nc_latest_header(), 'broadcast'))

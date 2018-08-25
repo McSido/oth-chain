@@ -6,11 +6,13 @@ import hashlib
 import math
 import time
 from queue import Queue
+from queue import Empty
 
 import nacl.encoding
 import nacl.signing
 
 from chains import Transaction, Block, Header, PoW_Blockchain
+import utils
 
 VERSION = 0.7
 
@@ -23,6 +25,8 @@ class TestPOW(object):
     def setup(self):
         """ Setup of the blockchain for the tests.
         """
+        utils.set_debug()
+
         self.sends = Queue()
 
         self.gui_queue = Queue()
@@ -86,7 +90,7 @@ class TestPOW(object):
         """ Test that the transactions with invalid signatures are recognized
         and not added to the blockchain.
         """
-        self.mine_block()
+        self.mine_block(self.blockchain)
 
         transaction = self.create_transaction()
         transaction = Transaction(
@@ -114,7 +118,7 @@ class TestPOW(object):
     def test_transaction_invalid_double(self):
         """ Test that the same transaction is not added twice to the blockchain.
         """
-        self.mine_block()
+        self.mine_block(self.blockchain)
 
         transaction = self.create_transaction()
 
@@ -131,7 +135,7 @@ class TestPOW(object):
         """ Test that a valid transaction is recognized and added to the
         blockchain.
         """
-        self.mine_block()
+        self.mine_block(self.blockchain)
 
         transaction = self.create_transaction()
 
@@ -142,14 +146,132 @@ class TestPOW(object):
         assert transaction in self.blockchain.transaction_pool
         assert not self.sends.empty()
 
+    def test_new_header(self, capsys):
+
+        with capsys.disabled():
+            proof = self.blockchain.create_proof(self.sender_verify)
+            last_header = self.blockchain.latest_header()
+
+            # Valid
+
+            new_header = Header(0,
+                                1,
+                                time.time(),
+                                last_header.root_hash,
+                                123,
+                                proof
+                                )
+
+            self.blockchain.process_message(('new_header',
+                                             new_header,
+                                             ''))
+
+            assert self.sends.get() == ('get_block', new_header, 'broadcast')
+
+        # Invalid
+
+        new_header = Header(0,
+                            1,
+                            time.time(),
+                            321,
+                            123,
+                            proof
+                            )
+
+        self.blockchain.process_message(('new_header',
+                                         new_header,
+                                         ''))
+
+        captured = capsys.readouterr()
+        assert captured.out == '### DEBUG ### Invalid header\n'
+
+        # Farther away
+        new_header = Header(0,
+                            123,
+                            time.time(),
+                            321,
+                            last_header.root_hash,
+                            proof
+                            )
+
+        self.blockchain.process_message(('new_header',
+                                         new_header,
+                                         ''))
+
+        assert self.sends.get() == ('get_chain', '', 'broadcast')
+
+    def test_get_block(self):
+        b = self.blockchain.latest_block()
+
+        assert b == self.blockchain.get_block(b.header)
+
+        assert not self.blockchain.get_block('')
+
+    def test_send_block(self):
+        self.mine_block(self.blockchain)
+        b = self.blockchain.latest_block()
+
+        self.blockchain.send_block(b.header, '123')
+
+        assert self.sends.get() == ('new_block', b, '123')
+
+    def test_merkle_root(self):
+        t = [self.create_transaction() for i in range(15)]
+
+        assert self.blockchain.create_merkle_root(t) == \
+            self.blockchain.create_merkle_root(list(reversed(t)))
+
+    def test_msg_transaction(self):
+        self.mine_block(self.blockchain)
+
+        t = self.create_transaction()
+        self.blockchain.process_message(('new_transaction', t, ''))
+
+        assert t in self.blockchain.transaction_pool
+
+    def test_resolve_conflict(self):
+        self.mine_block(self.blockchain)
+
+        t = self.create_transaction()
+
+        self.blockchain.new_transaction(t)
+        self.mine_block(self.blockchain)
+
+        bchain2 = PoW_Blockchain(VERSION,
+                                 Queue(),
+                                 Queue()
+                                 )
+
+        for _ in range(3):
+            self.mine_block(bchain2)
+
+        bchain2.new_transaction(t)
+        bchain2.process_message(('mine', self.sender_verify, 'local'))
+
+        self.blockchain.resolve_conflict(bchain2.get_header_chain())
+
+        assert bchain2.latest_header() == self.blockchain.nc_latest_header()
+
+        for _ in range(3):
+            self.mine_block(bchain2)
+        self.blockchain.resolve_conflict(bchain2.get_header_chain())
+        assert bchain2.latest_header() == self.blockchain.nc_latest_header()
+
+        # Chain exchange
+
+        for b in bchain2.get_block_chain():
+            self.blockchain.new_block(b)
+
+        assert bchain2.latest_block() == self.blockchain.latest_block()
+
     # ####################### HELPER FUNCTIONS ###########################
 
-    def mine_block(self):
+    def mine_block(self, chain):
         """ Mine an initial block to add a balance to the test account.
         """
 
-        proof = self.blockchain.create_proof(self.sender_verify)
-        block = self.blockchain.create_block(proof)
+        proof = chain.create_proof(self.sender_verify)
+        block = chain.create_block(proof)
         block.transactions.append(
             Transaction(sender='0',
                         recipient=self.sender_verify,
@@ -158,7 +280,7 @@ class TestPOW(object):
                         timestamp=time.time(),
                         signature='0'))
 
-        root_hash = self.blockchain.create_merkle_root(block.transactions)
+        root_hash = chain.create_merkle_root(block.transactions)
         real_header = Header(
             block.header.version,
             block.header.index,
@@ -169,8 +291,11 @@ class TestPOW(object):
         )
         real_block = Block(real_header, block.transactions)
 
-        self.blockchain.new_block(real_block)
-        self.sends.get(timeout=1)  # Remove new_block message
+        chain.new_block(real_block)
+        try:
+            self.sends.get(block=False)  # Remove new_block message
+        except Empty:
+            pass
 
     def create_transaction(self):
         """ Create simple transaction used in tests.

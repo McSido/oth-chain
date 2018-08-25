@@ -134,8 +134,13 @@ class DNSBlockChain(PoW_Blockchain):
         msg_type, msg_data, msg_address = message
         if msg_type == 'dns_lookup':
             ip = self._resolve_domain_name(msg_data)
-            result = f'Domain name {msg_data} could not be found.' if not ip[0] else ip
-            print(result)
+            if not ip[0]:
+                result = f'Domain name {msg_data} could not be found.'
+            elif ip[0] == 'N/A':
+                result = f'No ip address connected to this domain, owner: {ip[1]}'
+            else:
+                result = ip
+            print(result[0])
             if self.gui_ready:
                 self.gui_queue.put(('resolved', result, 'local'))
         elif msg_type == 'get_auctions':
@@ -203,7 +208,7 @@ class DNSBlockChain(PoW_Blockchain):
             for transaction in block_transaction[::-1]:
                 if transaction.data.domain_name == name:
                     if transaction.data.type == 't':
-                        return '', transaction.recipient
+                        return 'N/A', transaction.recipient
                     return transaction.data.ip_address, transaction.sender
 
         return '', ''

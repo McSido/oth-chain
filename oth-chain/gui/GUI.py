@@ -270,11 +270,14 @@ class ChainHistoryWidget(QWidget):
             timestamp = time.strftime("%d.%m.%Y %H:%M:%S %Z",
                                       time.gmtime(transaction.timestamp))
             for i in range(self.transaction_pool_item.childCount()):
-                if self.transaction_pool_item.child(i).child(4).text(1) == timestamp:
+                if self.get_timestamp_from_child(self.transaction_pool_item.child(i)) == timestamp:
                     items_to_delete.append(self.transaction_pool_item.child(i))
 
         for item in items_to_delete:
             self.transaction_pool_item.removeChild(item)
+
+    def get_timestamp_from_child(self, child: QTreeWidgetItem):
+        return child.child(4).text(1)
 
 
 class PeerWidget(QWidget):
@@ -515,7 +518,7 @@ class TransactionWidget(QWidget):
         self.save_key_button.clicked.connect(self.save_signing_key)
         self.export_key_button.clicked.connect(self.export_verify_key)
 
-        self.user_group_box_form.addRow(QLabel('User:'), self.user_field)
+        self.user_group_box_form.addRow(QLabel('User (Public key):'), self.user_field)
         self.user_group_box_form.addRow(key_hbox)
 
         self.mine_button.clicked.connect(self.mine)
