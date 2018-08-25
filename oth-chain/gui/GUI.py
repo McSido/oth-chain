@@ -518,7 +518,7 @@ class TransactionWidget(QWidget):
         self.save_key_button.clicked.connect(self.save_signing_key)
         self.export_key_button.clicked.connect(self.export_verify_key)
 
-        self.user_group_box_form.addRow(QLabel('User:'), self.user_field)
+        self.user_group_box_form.addRow(QLabel('User (Public key):'), self.user_field)
         self.user_group_box_form.addRow(key_hbox)
 
         self.mine_button.clicked.connect(self.mine)

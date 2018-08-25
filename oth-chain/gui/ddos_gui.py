@@ -10,7 +10,7 @@ import nacl.encoding
 import nacl.signing
 import nacl.utils
 
-from utils import Keystore, load_key, save_key, Node
+from utils import load_key, save_key, Node
 from chains import Block, DDosTransaction, DDosHeader, DDosData
 from networking import Address
 from . import GUI
@@ -23,7 +23,7 @@ from PyQt5 import QtCore, QtGui
 from queue import Queue
 
 
-def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keystore):
+def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue):
     """ Main function of the GUI thread, creates the GUI, passes the queues to it, and
         starts the execution.
         Args:
@@ -40,9 +40,8 @@ def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keys
 
 
 class DDOSChainGUI(GUI.ChainGUI):
-    """ Provides a GUI for the DNS-Chain. Provides the same functionality
-        as the base class as well as additional functions specifically for
-        the DNS-Chain.
+    """ Provides a GUI for the DDOS-Chain. Replaces the default transaction form
+        with a DDoS chain specific transaction form.
     """
 
     def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
@@ -71,8 +70,9 @@ class DDOSChainGUI(GUI.ChainGUI):
         message_thread.start()
 
     def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
-        if True:
-            pass
+        if msg_type == 'tree':
+            self.splitter.widget(0).client_tab.set_tree(msg_data)
+            self.splitter.widget(1).client_tab.load_data_from_tree(msg_data)
         else:
             super(DDOSChainGUI, self).handle_message(msg_type, msg_data, msg_address)
 
@@ -170,23 +170,34 @@ class ClientWidget(QWidget):
         self.layout = QVBoxLayout()
 
         self.clients = QTreeWidget()
-        self.clients.setColumnCount(2)
-        self.clients.setColumnWidth(0, 200)
-
-        self.root_item = QTreeWidgetItem()
-        self.root_item.setText(0, 'Root')
+        self.clients.setColumnCount(1)
+        self.clients.setColumnWidth(0, 400)
 
         self.layout.addWidget(self.clients)
 
         self.setLayout(self.layout)
 
-    def load_data_from_tree(self, tree: Node):
-        pass
+    def load_data_from_tree(self, tree: Node, parent_item: QTreeWidgetItem = None):
+        if parent_item is None:
+            parent_item = QTreeWidgetItem()
+            parent_item.setText(0, str(tree.content))
+            self.clients.addTopLevelItem(parent_item)
+        for child in tree.children:
+            child_item = QTreeWidgetItem()
+            child_item.setText(0, str(child.content))
+            parent_item.addChild(child_item)
+            self.load_data_from_tree(child, child_item)
 
     def add_to_tree(self, node: Node):
+        # find parent tree item
+        # create new item
+        # add new item to parent item
         pass
 
     def remove_from_tree(self, node: Node):
+        # find parent tree item
+        # find index of child item
+        # remove child item from parent item
         pass
 
 
@@ -214,6 +225,8 @@ class TransactionWidget(GUI.TransactionWidget):
         self.invite_radio.toggled.connect(lambda: self.change_operation(self.invite_radio))
         self.uninvite_radio.toggled.connect(lambda: self.change_operation(self.uninvite_radio))
         self.purge_radio.toggled.connect(lambda: self.change_operation(self.purge_radio))
+
+        self.block_radio.toggle()
 
         radio_hbox.addWidget(self.block_radio)
         radio_hbox.addWidget(self.unblock_radio)

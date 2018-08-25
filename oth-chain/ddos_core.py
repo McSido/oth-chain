@@ -92,7 +92,7 @@ def init(port: int, signing_key):
 
     gui_thread = threading.Thread(
         target=ddos_gui_loop,
-        args=(core.gui_send_queue, core.receive_queue, core.gui_receive_queue, None)
+        args=(core.gui_send_queue, core.receive_queue, core.gui_receive_queue)
     )
 
     verify_key = signing_key.verify_key
