@@ -44,7 +44,7 @@ class DNSChainGUI(GUI.ChainGUI):
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
-        self.setWindowTitle('oth-chain')
+        self.setWindowTitle('oth-chain (DNS Chain)')
         self.setGeometry(500, 200, 1000, 500)
         self.show()
 

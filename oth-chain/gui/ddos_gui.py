@@ -48,7 +48,7 @@ class DDOSChainGUI(GUI.ChainGUI):
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
-        self.setWindowTitle('oth-chain')
+        self.setWindowTitle('oth-chain (DDoS Chain)')
         self.setGeometry(500, 200, 1000, 500)
         self.show()
 
