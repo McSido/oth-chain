@@ -23,11 +23,24 @@ pip install -r requirements.txt
 1. Clone repo
 2. Edit [peers.cfg](./peers.cfg) if needed
 
+## Blockchains
+
+As part of this project different Blockchains have been implemented.  
+They all follow the pattern: [Header|Transaction], in which the header usually contains information such as version/index/timestamp/previous_hash/root_hash and the transactions information about the sender/receiver as well as a signature for the transaction.
+
+The inheritance is as follows:
+
+<img src="./documentation/ClassDiagram.svg">
+
 ## Proof-of-Work Blockchain
 
 ### Description
 
 This Blockchain is built to show the basic principles of a public Blockchain. It uses a proof-of-work algorithm to prevent tampering. Popular Blockchains such as Bitcoin and Ethereum were used as basis for design decisions.
+
+In this blockchain coins can be sent between accounts.  
+The mining works by trying to find a solution in which `hash(last_block.proof,proof,miner_key)` starts with as many 0 as described by the difficulty. The difficulty increases as time goes on. The hashing algorithm used is _sha256_.  
+For the mining of a valid block, `50 >> 2 ** reward_multiplicator` coins will be rewarded to the miner. By setting the reward_multiplicator to `math.floor(block.header.index / 10) - 1` the mining reward becomes smaller until it reaches 0, at this point no more coins will be created. The mining compensation at that points happens via transaction fees.
 
 ### Usage
 
@@ -85,7 +98,7 @@ Additionally to the [commands](#Commands) of the [Proof-of-Work Blockchain](#Pro
 **update \<domain> \<ip>** : Updates an existing already owned domain with a new IP (costs 20 coins)  
 **transfer \<to> \<domain>** : Transfers an owned domain to another user (costs 1 coin)  
 **auction \<domain>** : Offers an owned domain for auction (costs 1 coin)  
-**bid \<amount> \<domain>** : Places a bid of <\amount> on the auctioned domain.  
+**bid \<amount> \<domain>** : Places a bid of \<amount> on the auctioned domain.  
 **resolve \<domain>** : Resolves the domain name and prints the IP (if the domain does not exist, prints '')  
 
 ### Description - Server
@@ -173,15 +186,19 @@ This modules contains all different blockchain implementations.
 
 ### [gui](./oth-chain/gui)
 
-This module contains the GUI for the blockchains.
+This module contains the GUI for the blockchains.  
+The GUI is a QT application, written with pyqt5.
 
 ### [networking](./oth-chain/networking)
 
-This module contains everything needed for the P2P communication for the blockchains.
+This module contains everything needed for the P2P communication for the blockchains.  
+The communication happens via an extended UDP protocol, which allows for rebuilding of split packages.
 
 ### [serializer](./oth-chain/serializer)
 
-This module is used to (de)serialize the data used in the blockchains.
+This module is used to (de)serialize the data used in the blockchains.  
+JSON is used as a data format.  
+[Further information](./documentation/protocol.md)
 
 ### [utils](./oth-chain/utils)
 
@@ -191,34 +208,10 @@ This module contains the utility functionality used in the blockchains:
 * **node**: Tree structure used for the access hierarchy of the DDoS-chain
 * **utils**: Additional utility functions (e.g. print_debug)
 
----
-
-#### [blockchain.py](./blockchain.py)
-
-Contains an abstract class of a blockchain \
-Current implementations:
-
-* [pow_chain.py](./pow_chain.py)
-
-A Proof-of-Work blockchain that uses sha256 as the hashing-algorithm \
-Basic functionality implemented
-
-#### [networking.py](./networking.py)
-
-Responsible for all parts of the networking/P2P aspect of the blockchain \
-Uses UDP packages
-
-#### [core.py](./core.py)
-
-Start of the blockchain \
-Responsible for the setup of the blockchain and networking system \
-CLI loop
-
----
-
 ## Internal communication
 
-Internal communication (between threads) of the blockchain is handled via two Queues \
+Internal communication (between threads) of the blockchain is handled via Queues
+
 <img src="./documentation/Blockchain_internal.svg">
 
 ## Networking protocol
@@ -229,5 +222,4 @@ Messages contain a message-type and message-data \
 
 ## [Tests](./oth-chain/tests)
 
-For testing run pytest -v\
-OUTDATED: Additional stress-tests are in [stress-test.py](./stress-test.py)
+For testing run pytest -v
