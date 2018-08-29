@@ -32,9 +32,7 @@ def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keys
             keystore: Keystore object, obtained from core
     """
     app = QApplication(sys.argv)
-    ex = ChainGUI(keystore)
-    ex.initUI(chain_queue, gui_queue, command_queue)
-
+    ex = ChainGUI(keystore, chain_queue, gui_queue, command_queue)
     sys.exit(app.exec_())
 
 
@@ -43,31 +41,36 @@ class ChainGUI(QMainWindow):
         and interacting with the blockchain.
         Args:
             keystore: The keystore to manage public keys of other clients
-    """
-
-    def __init__(self, keystore: Keystore):
-        super(ChainGUI, self).__init__()
-        self.keystore = keystore
-
-    def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
-        """ Initialises the ui and sets the queues.
-            Starts the thread for receiving messages.
-            Args:
-                chain_queue: Queue for messages addressed to the blockchain
+            chain_queue: Queue for messages addressed to the blockchain
                 gui_queue: Queue for messages addressed to the GUI
                 command_queue: Queue for commands to the core thread
-        """
+    """
+
+    def __init__(self, keystore: Keystore, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
+        super(ChainGUI, self).__init__()
+        self.keystore = keystore
         self.splitter = QSplitter()
         self.chain_queue = chain_queue
         self.gui_queue = gui_queue
         self.command_queue = command_queue
+        self.initUI()
+
+    def initUI(self):
+        """ Initialises the ui and sets the queues.
+            Starts the thread for receiving messages.
+        """
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
         self.setWindowTitle('oth-chain')
         self.setGeometry(500, 200, 1000, 500)
         self.show()
+        self.start_message_thread()
 
+    def start_message_thread(self):
+        """ Starts the thread that waits for
+            and reacts to messages
+        """
         message_thread = threading.Thread(
             target=self.wait_for_message
         )
@@ -592,7 +595,15 @@ class TransactionWidget(QWidget):
                               'gui'
                               ))
 
-    def prepare_transaction(self, recipient, amount, fee, timestamp):
+    def prepare_transaction(self, recipient, amount, fee, timestamp) -> Transaction:
+        """ Takes a list of arguments and
+            builds a Transaction object from them.
+            Args:
+                recipient: The recipient of the transaction.
+                amount: The amount of coins being sent.
+                fee: The fee for the transaction.
+                timestamp: The time when the transaction occurred.
+        """
         transaction_hash = hashlib. \
             sha256((str(self.verify_key_hex) +
                     str(recipient) + str(amount)

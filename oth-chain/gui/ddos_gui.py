@@ -30,12 +30,9 @@ def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue):
             gui_queue: Queue for messages addressed to the GUI
             chain_queue: Queue for messages addressed to the blockchain
             command_queue: Queue for commands to the core thread.
-            keystore: Keystore object, obtained from core
     """
     app = QApplication(sys.argv)
-    ex = DDOSChainGUI(None)
-    ex.initUI(chain_queue, gui_queue, command_queue)
-
+    ex = DDOSChainGUI(None, chain_queue, gui_queue, command_queue)
     sys.exit(app.exec_())
 
 
@@ -44,32 +41,26 @@ class DDOSChainGUI(GUI.ChainGUI):
         with a DDoS chain specific transaction form.
     """
 
-    def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
-        """ Initialises the ui and sets the queues.
+    def initUI(self):
+        """ Initialises the ui.
             Starts the thread for receiving messages.
-            Args:
-                chain_queue: Queue for messages addressed to the blockchain
-                gui_queue: Queue for messages addressed to the GUI
-                command_queue: Queue for commands to the core thread
         """
-        self.splitter = QSplitter()
-        self.chain_queue = chain_queue
-        self.gui_queue = gui_queue
-        self.command_queue = command_queue
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
-        self.setWindowTitle('oth-chain')
+        self.setWindowTitle('oth-chain (DDoS Chain)')
         self.setGeometry(500, 200, 1000, 500)
         self.show()
 
-        message_thread = threading.Thread(
-            target=self.wait_for_message
-        )
-        message_thread.setDaemon(True)
-        message_thread.start()
+        self.start_message_thread()
 
     def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
+        """ Handles DDoS specific messages or delegates them to the superclass.
+            Args:
+                msg_type: Specifies the incoming message.
+                msg_data: The data contained within the message.
+                msg_address: From where the message was sent.
+        """
         if msg_type == 'tree':
             self.splitter.widget(1).set_tree(msg_data)
             self.splitter.widget(0).client_tab.load_data_from_tree(msg_data)
@@ -82,9 +73,10 @@ class DDOSChainGUI(GUI.ChainGUI):
 
 class TabWidget(QWidget):
     """ Widget that holds multiple tabs, for better overview.
-            Args:
-                parent: The parent widget.
-        """
+        Overwritten from GUI.py to use DDoS specific widgets
+        Args:
+            parent: The parent widget.
+    """
 
     def __init__(self, parent: QWidget):
         super(TabWidget, self).__init__(parent)
@@ -104,8 +96,17 @@ class TabWidget(QWidget):
 
 
 class ChainHistoryWidget(GUI.ChainHistoryWidget):
+    """ DDoS specific version of the ChainHistoryWidget
+        Holds blocks and transactions and displays them
+        in a tree like view.
+    """
 
     def add_tree_item(self, block: Block):
+        """ Builds a tree widget item from a given block and
+            adds it to the tree view.
+            Args:
+                block: The block to build an item from.
+        """
         item = QTreeWidgetItem()
         item.setText(0, 'Block')
         item.setText(1, '#' + str(block.header.index))
@@ -132,6 +133,13 @@ class ChainHistoryWidget(GUI.ChainHistoryWidget):
 
     @classmethod
     def create_transaction_item(cls, transaction: DDosTransaction, number: int) -> QTreeWidgetItem:
+        """ Takes a DDosTransaction object and builds
+            a tree widget item from it.
+            Args:
+                  transaction: The given transaction
+                  number: Specifies the number of the
+                    transaction in the current context
+        """
         item = QTreeWidgetItem()
         item.setText(0, 'Transaction')
         item.setText(1, '#' + str(number))
@@ -163,10 +171,21 @@ class ChainHistoryWidget(GUI.ChainHistoryWidget):
         return item
 
     def get_timestamp_from_child(self, child: QTreeWidgetItem):
+        """ Returns the timestamp of a given tree widget item
+            to identify specific items.
+            Args:
+                child: The item from which to get the timestamp
+        """
         return child.child(1).text(1)
 
 
 class ClientWidget(QWidget):
+    """ Displays the descendants of the current user
+        in the invitation tree of the chain and displays
+        them in a tree like fashion.
+        Args:
+            parent: The parent widget
+    """
 
     def __init__(self, parent: QWidget):
         super(ClientWidget, self).__init__(parent)
@@ -181,6 +200,13 @@ class ClientWidget(QWidget):
         self.setLayout(self.layout)
 
     def load_data_from_tree(self, tree: Node, parent_item: QTreeWidgetItem = None):
+        """ Takes a node object and initializes the tree view with the contents
+            of the nodes.
+            Args:
+                tree: the 'root' node of the given tree
+                parent_item: Specifies the parent item to append new items to.
+                    Used for recursive calls of the function
+        """
         if parent_item is None:
             parent_item = QTreeWidgetItem()
             parent_item.setText(0, str(tree.content))
@@ -192,12 +218,22 @@ class ClientWidget(QWidget):
             self.load_data_from_tree(child, child_item)
 
     def add_to_tree(self, sender: str, key: str):
+        """ Takes a key and adds it to the children of the item
+            specified by a given sender.
+            Args:
+                sender: Specifies who invited the user
+                key: public key of the invited user
+        """
         parent = self.find_item(sender)
         item = QTreeWidgetItem()
         item.setText(0, key)
         parent.addChild(item)
 
     def remove_from_tree(self, key: str):
+        """ Takes a key and removes it from the tree
+            Args:
+                key: public key of the uninvited user
+        """
         item = self.find_item(key)
         parent = item.parent()
         for i in range(item.childCount()):
@@ -206,10 +242,20 @@ class ClientWidget(QWidget):
         parent.removeChild(item)
 
     def find_item(self, key: str) -> QTreeWidgetItem:
+        """ Takes a key and returns the item holding it
+            Args:
+                key: public key of some user.
+        """
         item = self.clients.findItems(key, QtCore.Qt.MatchRecursive, 0)[0]
         return item
 
     def react_to_operation(self, transaction: DDosTransaction):
+        """ Takes a transaction and reacts to it.
+            Args:
+                transaction: DDoSTransaction object.
+                    If the transaction holds an (un-)invitation,
+                    the respective functions are called.
+        """
         if transaction.data.type == 'ui':
             self.remove_from_tree(str(transaction.data.data))
         elif transaction.data.type == 'i':
@@ -217,6 +263,11 @@ class ClientWidget(QWidget):
 
 
 class TransactionWidget(GUI.TransactionWidget):
+    """ Sub class of GUI.TransactionWidget.
+        Changed to accommodate the needs of the DDoS chain.
+        Args:
+            parent: The parent widget
+    """
 
     def __init__(self, parent: QWidget):
         self.ip_edit = QLineEdit()
@@ -239,6 +290,8 @@ class TransactionWidget(GUI.TransactionWidget):
         self.mine_button.hide()
 
     def prepare_transaction_form(self):
+        """ Prepares the transaction form of this widget.
+        """
         radio_hbox = QHBoxLayout()
 
         self.block_radio.toggled.connect(lambda: self.change_operation(self.block_radio))
@@ -281,6 +334,9 @@ class TransactionWidget(GUI.TransactionWidget):
         self.layout.addWidget(self.transaction_group_box)
 
     def send_transaction(self):
+        """ Determines the DDoS Data object for the transaction
+            calls a function to build the transaction and sends it.
+        """
         if self.current_operation == 'b' or self.current_operation == 'ub':
             data = self.ip_edit.text()
         elif self.current_operation == 'i':
@@ -291,6 +347,11 @@ class TransactionWidget(GUI.TransactionWidget):
         self.chain_queue.put(('new_transaction', transaction, 'gui'))
 
     def prep_transaction(self, data: DDosData):
+        """ Takes a DDoS Data object and builds
+            a DDoSTransaction object from it.
+            Args:
+                data: The DDoS Data specifying a certain operation.
+        """
         timestamp = time.time()
         hash_str = (str(self.verify_key_hex) +
                     str(data) +
@@ -307,6 +368,11 @@ class TransactionWidget(GUI.TransactionWidget):
         return transaction
 
     def change_operation(self, button: QRadioButton):
+        """ Dis-/Enables specific widgets, according to the
+            selected radio button.
+            Args:
+                button: The button, that was toggled.
+        """
         if not button.isChecked():
             return
         self.ip_edit.setEnabled(False)
@@ -329,10 +395,20 @@ class TransactionWidget(GUI.TransactionWidget):
             self.current_operation = 'p'
 
     def set_tree(self, tree: Node):
+        """ Sets the invitation tree of this widget and
+            adds the contents of the tree to a selection box.
+            Args:
+                tree: The invitation tree to accept.
+        """
         self.tree = tree
         self.descendants.addItems(str(d.content) for d in tree.get_descendants())
 
     def react_to_operation(self, transaction: DDosTransaction):
+        """ Takes a transaction and reacts to it, if
+            a user is (un-)invited.
+            Args:
+                transaction: The transaction containing a certain operation.
+        """
         if transaction.data.type == 'i':
             self.descendants.addItem(transaction.data.data)
         elif transaction.data.type == 'ui':

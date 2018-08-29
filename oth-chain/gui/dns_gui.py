@@ -19,7 +19,7 @@ from . import GUI
 
 def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keystore):
     """ Main function of the GUI thread, creates the GUI, passes the queues to it, and
-        starts the execution.
+        starts the execution. Overwritten from GUI.py to call the DNSChainGUI class instead.
         Args:
             gui_queue: Queue for messages addressed to the GUI
             chain_queue: Queue for messages addressed to the blockchain
@@ -27,9 +27,7 @@ def gui_loop(gui_queue: Queue, chain_queue: Queue, command_queue, keystore: Keys
             keystore: Keystore object, obtained from core
     """
     app = QApplication(sys.argv)
-    ex = DNSChainGUI(keystore)
-    ex.initUI(chain_queue, gui_queue, command_queue)
-
+    ex = DNSChainGUI(keystore, chain_queue, gui_queue, command_queue)
     sys.exit(app.exec_())
 
 
@@ -39,32 +37,26 @@ class DNSChainGUI(GUI.ChainGUI):
         the DNS-Chain.
     """
 
-    def initUI(self, chain_queue: Queue, gui_queue: Queue, command_queue: Queue):
+    def initUI(self):
         """ Initialises the ui and sets the queues.
             Starts the thread for receiving messages.
-            Args:
-                chain_queue: Queue for messages addressed to the blockchain
-                gui_queue: Queue for messages addressed to the GUI
-                command_queue: Queue for commands to the core thread
         """
-        self.splitter = QSplitter()
-        self.chain_queue = chain_queue
-        self.gui_queue = gui_queue
-        self.command_queue = command_queue
         self.splitter.addWidget(TabWidget(self))
         self.splitter.addWidget(TransactionWidget(self))
         self.setCentralWidget(self.splitter)
-        self.setWindowTitle('oth-chain')
+        self.setWindowTitle('oth-chain (DNS Chain)')
         self.setGeometry(500, 200, 1000, 500)
         self.show()
 
-        message_thread = threading.Thread(
-            target=self.wait_for_message
-        )
-        message_thread.setDaemon(True)
-        message_thread.start()
+        self.start_message_thread()
 
     def handle_message(self, msg_type: str, msg_data: Any, msg_address: Address):
+        """ Handles DNS specific messages or delegates them to the superclass.
+                    Args:
+                        msg_type: Specifies the incoming message.
+                        msg_data: The data contained within the message.
+                        msg_address: From where the message was sent.
+                """
         if msg_type == 'auction':
             self.splitter.widget(0).auction_tab.new_auction(*msg_data)
             self.splitter.widget(1).add_to_auction_list(msg_data[0][0].data.domain_name)
@@ -86,6 +78,7 @@ class DNSChainGUI(GUI.ChainGUI):
 
 class TabWidget(QWidget):
     """ Widget that holds multiple tabs, for better overview.
+        Overwritten from GUI.py to hold use DNS specific widgets.
         Args:
             parent: The parent widget.
     """
@@ -115,6 +108,13 @@ class ChainHistoryWidget(GUI.ChainHistoryWidget):
 
     @classmethod
     def create_transaction_item(cls, transaction: DNS_Transaction, number: int) -> QTreeWidgetItem:
+        """ Takes a DNS_Transaction object and
+            builds a tree widget item out of it.
+            Args:
+                transaction: The transaction
+                number: Specifies the index of the
+                    transaction in the current context.
+        """
         item = super(ChainHistoryWidget, cls).create_transaction_item(transaction, number)
         if not transaction.data == DNS_Data('', '', ''):
             data = QTreeWidgetItem()
@@ -246,6 +246,8 @@ class TransactionWidget(GUI.TransactionWidget):
         self.chain_queue.put(('get_auctions', '', 'gui'))
 
     def prepare_dns_form(self):
+        """ Prepares the form used for DNS-Operations.
+        """
         self.dns_box_form.addRow(QLabel('DNS Operations:'))
         self.register_radio.toggled.connect(lambda: self.operation_changed(self.register_radio))
         self.update_radio.toggled.connect(lambda: self.operation_changed(self.update_radio))
@@ -310,19 +312,28 @@ class TransactionWidget(GUI.TransactionWidget):
         self.layout.addWidget(self.dns_box)
 
     def domain_resolved(self, result: Any):
+        """ Updates the resolve label with the result from the chain.
+        """
         if type(result) == str:
             self.resolve_label.setText(result)
         else:
             self.resolve_label.setText(f'IP: {result[0]}, Owner: {str(result[1])}')
 
     def resolve(self):
+        """ Sends a message to the DNSChain to resolve a given domain.
+        """
         self.chain_queue.put(('dns_lookup', self.resolve_edit.text(), 'gui'))
 
     def add_to_auction_list(self, domain_name: str):
+        """ Adds a domain name to the list of auctioned domains:
+            Args:
+                domain_name: The newly auctioned domain
+        """
         self.auction_domain_list.append(domain_name)
         self.auctioned_domains.addItem(domain_name)
 
-    def valid_ip(self):
+    def valid_ip(self) -> bool:
+        """ Validates whether the entered ip is valid."""
         try:
             socket.inet_aton(self.ip_address_edit.text())
             self.dns_error_label.setText('')
@@ -332,6 +343,11 @@ class TransactionWidget(GUI.TransactionWidget):
             return False
 
     def operation_changed(self, button: QRadioButton):
+        """ Dis-/Enables specific widgets according
+            to the selected radio button
+            Args:
+                button: The toggled radio button.
+        """
         if not button.isChecked():
             return
         for widget in [self.bid_amount_edit, self.dns_recipient_edit, self.owned_domains, self.auctioned_domains,
@@ -358,11 +374,23 @@ class TransactionWidget(GUI.TransactionWidget):
             self.current_operation = 'Bid'
 
     def remove_from_auctions(self, domain_name: str):
+        """ Removes a domain from the list of auctioned domains
+            Args:
+                domain_name: The domain of the expired auction.
+        """
         self.auction_domain_list.remove(domain_name)
         index = self.auctioned_domains.findText(domain_name)
         self.auctioned_domains.removeItem(index)
 
     def prepare_transaction(self, recipient, amount, fee, timestamp, dns_data=DNS_Data('', '', '')):
+        """ Takes a list of parameters and builds a DNS_Transaction object from them.
+            Args:
+                recipient: The recipient of the transaction.
+                amount: The amount of coins being sent.
+                fee: The fee for the transaction.
+                timestamp: The timestamp of when the transaction occurred.
+                dns_data: The DNS Operation included with the transaction.
+        """
         transaction_hash = hashlib. \
             sha256((str(self.verify_key_hex) +
                     str(recipient) + str(amount)
@@ -381,6 +409,9 @@ class TransactionWidget(GUI.TransactionWidget):
         return transaction
 
     def send_operation(self):
+        """ Reads the values from the widgets in the dns_form
+            and uses them to build a transaction and send it.
+        """
         self.dns_error_label.setText('')
         if self.current_operation == 'Register' or self.current_operation == 'Update':
             coins_required = 20
@@ -428,15 +459,29 @@ class TransactionWidget(GUI.TransactionWidget):
                               ))
 
     def add_to_owned_domains(self, domain_name: str):
+        """ Adds a domain name to the list of owned domains.
+            Args:
+                domain_name: The newly obtained domain_name.
+        """
         self.owned_domain_list.append(domain_name)
         self.owned_domains.addItem(domain_name)
 
     def remove_from_owned_domains(self, domain_name: str):
+        """ Removes a domain name from the list of owned domains.
+            Args:
+                domain_name: The name of the sold off domain.
+        """
         self.owned_domain_list.remove(domain_name)
         index = self.owned_domains.findText(domain_name)
         self.owned_domains.removeItem(index)
 
     def react_to_transaction(self, transaction: DNS_Transaction):
+        """ Takes a DNS_Transaction object and reacts accordingly
+            by calling certain methods.
+            Args:
+                transaction: The transaction containing a certain
+                    operation
+        """
         if transaction.data.type == 't':
             if transaction.sender == self.verify_key_hex:
                 self.remove_from_owned_domains(transaction.data.domain_name)
