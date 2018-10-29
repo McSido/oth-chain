@@ -206,8 +206,9 @@ class DDosChain(Blockchain):
 
         self.check_new_chain(block)
 
-    def validate_block(self, block: Block, last_block: Block) -> bool:
-        if not super().validate_block(block, last_block):
+    def validate_block(self, block: Block, last_block: Block,
+                       new_chain: bool = False) -> bool:
+        if not super().validate_block(block, last_block, new_chain):
             return False
 
         return all(self.validate_transaction(t) for t in block.transactions)

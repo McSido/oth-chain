@@ -26,7 +26,7 @@ pip install -r requirements.txt
 ## Blockchains
 
 As part of this project different Blockchains have been implemented.  
-They all follow the pattern: [Header|Transaction], in which the header usually contains information such as version/index/timestamp/previous_hash/root_hash and the transactions information about the sender/receiver as well as a signature for the transaction.
+They all follow the pattern: [Header|List of Transactions], in which the header usually contains information such as version/index/timestamp/previous_hash/root_hash and the transactions contain information about the sender/receiver as well as a signature for the transaction.
 
 The inheritance is as follows:
 
