@@ -291,7 +291,11 @@ class DDosChain(Blockchain):
         elif msg_type == 'show_children':
             node = self.tree.get_node_by_content(str(msg_data))
             if msg_address == 'local':
-                node.print()
+                if node:
+                    node.print()
+                else:
+                    print('Your key has not been invited to this blockchain!')
+                    print('If you were invited, please contact the person who invited you!')
             elif msg_address == 'gui':
                 self.gui_queue.put(('tree', node, 'local'))
 

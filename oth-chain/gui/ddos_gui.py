@@ -62,8 +62,9 @@ class DDOSChainGUI(GUI.ChainGUI):
                 msg_address: From where the message was sent.
         """
         if msg_type == 'tree':
-            self.splitter.widget(1).set_tree(msg_data)
-            self.splitter.widget(0).client_tab.load_data_from_tree(msg_data)
+            if msg_data:
+                self.splitter.widget(1).set_tree(msg_data)
+                self.splitter.widget(0).client_tab.load_data_from_tree(msg_data)
         elif msg_type == 'operation':
             self.splitter.widget(1).react_to_operation(msg_data)
             self.splitter.widget(0).client_tab.react_to_operation(msg_data)
