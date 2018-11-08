@@ -2,6 +2,7 @@ import getopt
 import sys
 import threading
 import dnslib.server
+import time
 
 from dnslib import RR, DNSRecord, RCODE
 from queue import Queue
@@ -50,7 +51,7 @@ def receive_msg(msg_type: str, msg_data: Any, msg_address: Address,
 
     if msg_type == 'dns_lookup':
         if msg_address == 'local':
-            ip = blockchain._resolve_domain_name(msg_data)[0]
+            ip = blockchain._resolve_domain_name(msg_data,time.time())[0]
             dns_queue.put(ip)
     else:
         core.receive_msg(msg_type, msg_data, msg_address,
